@@ -5,9 +5,11 @@ Sawtooth transaction family for Capability Based Access Control.
 ## build
 
 ```bash
-cd capbac-simplewallet
+cd sawtooth-capbac
 docker-compose up
 ```
+
+## test
 
 On another terminal:
 
