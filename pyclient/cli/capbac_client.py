@@ -80,9 +80,16 @@ class CapBACClient:
     # 1. Do any additional handling, if required
     # 2. Create a transaction and a batch
     # 2. Send to rest-api
+
     def issue(self, capability):
 
-        capability['IS'] = str(self._signer.get_public_key().as_hex())
+        # Add signature
+        device = capability['DE']
+        identifier = capability['ID']
+        issueIstant = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
+
+        capability['II'] = issueIstant
+        capability['SI'] = 'sign'#self._signer.sign(device +':'+ identifier +':'+ issueIstant)
 
         # Generate the CBOR encoded payload
         payload = cbor.dumps({
@@ -90,9 +97,7 @@ class CapBACClient:
             'CT': capability
         })
 
-        identifier = capability['ID']
-
-        return self._send_transaction(payload, [identifier], [identifier])
+        return self._send_transaction(payload, device)
 
     def _send_request(self,
                       suffix,
@@ -141,23 +146,17 @@ class CapBACClient:
         key_dir = os.path.join(home, ".sawtooth", "keys")
         return '{}/{}.pub'.format(key_dir, real_user)
 
-    def _send_transaction(self, payload, input_ids, output_ids):
+    def _send_transaction(self, payload, device):
 
-        # Construct the addresses
-        input_addresses = []
-        for identifier in input_ids:
-            input_addresses.append(self._get_address(identifier))
-
-        output_addresses = []
-        for identifier in output_ids:
-            output_addresses.append(self._get_address(identifier))
+        # Get the unique address for the device's tokens
+        address = self._get_address(device)
 
         header = TransactionHeader(
             signer_public_key=self._signer.get_public_key().as_hex(),
             family_name=FAMILY_NAME,
             family_version=FAMILY_VERSION,
-            inputs=input_addresses,
-            outputs=output_addresses,
+            inputs=[address],
+            outputs=[address],
             dependencies=[],
             payload_sha512=_sha512(payload),
             batcher_public_key=self._signer.get_public_key().as_hex(),

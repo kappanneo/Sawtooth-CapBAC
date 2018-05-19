@@ -57,6 +57,8 @@ def setup_loggers(verbose_level):
     logger.setLevel(logging.DEBUG)
     logger.addHandler(create_console_handler(verbose_level))
 
+# Parsers
+
 def create_parser(prog_name):
     parent_parser = create_parent_parser(prog_name)
 
@@ -121,17 +123,30 @@ def add_access_parser(subparsers, parent_parser):
         type=str,
         help='the access request')
 
-def _get_keyfile():
-    real_user = getpass.getuser()
+# Key-getters
+
+def _get_keyfile(subject):
     home = os.path.expanduser("~")
     key_dir = os.path.join(home, ".sawtooth", "keys")
-    return '{}/{}.priv'.format(key_dir, real_user)
+    return '{}/{}.priv'.format(key_dir, subject)
 
 def _get_pubkeyfile(subject):
-    real_user = getpass.getuser()
     home = os.path.expanduser("~")
     key_dir = os.path.join(home, ".sawtooth", "keys")
-    return '{}/{}.pub'.format(key_dir, real_user)
+    return '{}/{}.pub'.format(key_dir, subject)
+
+# Handlers
+
+def _do_issue(capability):
+
+    keyfile = _get_keyfile(capability['IS'])
+
+    client = CapBACClient(baseUrl=DEFAULT_URL, keyFile=keyfile)
+    response = client.issue(capability)
+
+    print("Response: {}".format(response))
+
+# Main
 
 def main(prog_name=os.path.basename(sys.argv[0]), args=None):
     if args is None:
@@ -143,22 +158,30 @@ def main(prog_name=os.path.basename(sys.argv[0]), args=None):
 
     setup_loggers(verbose_level=verbose_level)
 
-    keyfile = _get_keyfile()
-    client = CapBACClient(baseUrl=DEFAULT_URL, keyFile=keyfile)
+    try:
+        capability = json.loads(args.capability)
+    except ValueError:
+        raise CapBACException("Invalid capability: not a JSON")
 
-    capability = json.loads(args.capability)
+    # capability core check TODO: better
+    if 'ID' not in capability:
+        raise CapBACException("Invalid capability: 'ID' missing (token identifier)")
+    elif 'IS' not in capability:
+        raise CapBACException("Invalid capability: 'IS' missing (uri of issuer)")
+    elif 'SU' not in capability:
+        raise CapBACException("Invalid capability: 'SU' missing (public key of the subject)")
+    elif 'DE' not in capability:
+        raise CapBACException("Invalid capability: 'DE' missing (uri of device)")
 
     # Get the commands from cli args and call corresponding handlers
     if args.command == 'issue':
-        response = client.issue(capability)
+        _do_issue(capability)
 #    elif args.command == 'revoke':
 #        response = client.revoke(capability)
 #    elif args.command == 'access':
 #        response = client.access(capability, request)
     else:
         raise CapBACException("Invalid command: {}".format(args.command))
-
-    print("Response: {}".format(response))
 
 
 def main_wrapper():

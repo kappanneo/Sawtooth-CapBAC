@@ -90,16 +90,19 @@ class CapBACApplicator:  public sawtooth::TransactionApplicator {
         this->address_mapper = this->make_unique<AddressMapper>(CAPBAC_FAMILY);
     }
 
-    void CborToParams(std::string& action,
+    void CborToParamsAndCheck(
+                    std::string& action,
                     json& cap,
-                    json& req) {
+                    std::string& identifier,
+                    std::string& device,
+                    json& req){
         const std::string& raw_data = this->txn->payload();
         std::vector<uint8_t> data_vector = ToVector(raw_data);
         json capbac_cmd = json::from_cbor(data_vector);
 
         if (!capbac_cmd.is_object()) {
             throw sawtooth::InvalidTransaction(
-                ": requires CBOR Object as the encoded command");
+                ": required CBOR Object as the encoded command");
         }
 
         auto action_it = capbac_cmd.find("AC");
@@ -117,54 +120,90 @@ class CapBACApplicator:  public sawtooth::TransactionApplicator {
         }
         cap = *cap_it;
 
+        // capability core check TODO: better
+        std::string issuer;
+        std::string subject;
+        std::string issueIstant;
+        std::string signature;
+
+        auto id_it = cap.find("ID");
+        if ( id_it == cap.end() ) {
+            throw sawtooth::InvalidTransaction(
+                ": Invalid Capability: 'ID' missing (token identifier)");
+        } else identifier = *id_it;
+        auto ii_it = cap.find("II");
+        if ( ii_it == cap.end() ) {
+            throw sawtooth::InvalidTransaction(
+                ": Invalid Capability: 'II' missing (issue istant)");
+        } else issueIstant = *ii_it;
+        auto is_it = cap.find("IS");
+        if ( is_it == cap.end() ) {
+            throw sawtooth::InvalidTransaction(
+                ": Invalid Capability: 'IS' missing (uri of issuer)");
+        } else issuer = *is_it;
+        auto su_it = cap.find("SU");
+        if ( su_it == cap.end() ) {
+            throw sawtooth::InvalidTransaction(
+                ": Invalid Capability: 'SU' missing (public key of the subject)");
+        } else subject = *su_it;
+        auto de_it = cap.find("DE");
+        if ( de_it == cap.end() ) {
+            throw sawtooth::InvalidTransaction(
+                ": Invalid Capability: 'DE' missing (uri of device)");
+        } else device = *de_it;
+        auto si_it = cap.find("SI");
+        if ( si_it == cap.end() ) {
+            throw sawtooth::InvalidTransaction(
+                ": Invalid Capability: 'SI' missing (issuer signature)");
+        } else signature = *si_it;
+
+        // Extract user's wallet public key from TransactionHeader
+        std::string sender;
+        sender = this->txn->header()->GetValue(
+            sawtooth::TransactionHeaderSignerPublicKey);
+
+        /*if(!VERIFY(signature,sender)){ TODO
+            std::stringstream error;
+            error << " Invalid signature: Token Issuer: " << issuer
+            << " Transaction signer: " << sender;
+            throw sawtooth::InvalidTransaction( error.str());
+        }*/
+
+        //case 1: issuer == device
+
+        /* notting to check */
+
+        //case 2: delegation
+
+        if(issuer != device){
+            if ( cap.find("PA") == cap.end() ) {
+                throw sawtooth::InvalidTransaction(
+                    ": Invalid Capability: 'PA' required (ID of the parent token)");
+            }
+        }
+
     }
 
     void Apply() {
+
         LOG4CXX_DEBUG(logger, "CapBACApplicator::Apply");
 
-        std::string subject;
         std::string action;
         std::string identifier;
-        std::string issuer;
+        std::string device;
         json cap;
         json req;
 
-        // Extract user's wallet public key from TransactionHeader
-        subject = this->txn->header()->GetValue(
-            sawtooth::TransactionHeaderSignerPublicKey);
-
-        // Extract action, identifier and issuer from encoded paylod
-        this->CborToParams(action, cap, req);
+        // Extract action, capability and request from encoded paylod (+ check)
+        this->CborToParamsAndCheck(action, cap, identifier, device, req);
 
         // Choose what to do based on action
         if (action == "issue") {
-
-            auto identifier_it = cap.find("ID");
-            if (identifier_it == cap.end()) {
-                throw sawtooth::InvalidTransaction(
-                    " Capability requires an Identifier");
-            }
-            identifier = *identifier_it;
-
-            //TODO: capabilty formal validity check
-
-            auto issuer_it = cap.find("IS");
-            if (issuer_it == cap.end()) {
-                throw sawtooth::InvalidTransaction(
-                    " Capability requires an Issuer");
-            }
-            issuer = *issuer_it;
-            if(subject != issuer){
-                std::stringstream error;
-                error << " Issuer not matching: Token Issuer: " << issuer
-                << " Transaction signer: " << subject;
-                throw sawtooth::InvalidTransaction( error.str());
-            }
-            this->IssueToken(cap,identifier);
+            this->IssueToken(cap,identifier,device);
         }
         else {
             std::stringstream error;
-            error << "invalid action: '" << action << "'";
+            error << " Invalid action: '" << action << "'";
             throw sawtooth::InvalidTransaction(error.str());
         }
     }
@@ -175,12 +214,14 @@ class CapBACApplicator:  public sawtooth::TransactionApplicator {
     }
 
     // Handle the CapBAC issue action
-    void IssueToken(const json& cap, const std::string& identifier) {
+    void IssueToken(const json& cap, const std::string& identifier,const std::string& device) {
 
-        // Generate the unique state address based on user's wallet public key
-        auto address = this->MakeAddress(identifier);
+        // Retrieve unique address for the device's tokens
+        auto address = this->MakeAddress(device);
+
         LOG4CXX_DEBUG(logger, "CapBACApplicator::IssueToken"
             << " ID: " << identifier
+            << " Device: " << device
             << " Address: " << address
             );
 
@@ -193,9 +234,26 @@ class CapBACApplicator:  public sawtooth::TransactionApplicator {
                 state_value_map = json::from_cbor(state_value_rep_v);
                 if (state_value_map.find(identifier) != state_value_map.end()) {
                     std::stringstream error;
-                    error << " Token already issued.";
+                    error << " Token " << identifier << " already issued";
                     throw sawtooth::InvalidTransaction(error.str());
                 }
+            }
+        }
+
+        //check delegation
+        auto current = cap;
+        if (*current.find("IS") != *current.find("DE")){
+            auto parent_it = state_value_map.find(*current.find("PA"));
+            if ( parent_it == state_value_map.end()){
+                std::stringstream error;
+                error << " Parent token" << *current.find("PA") << " revoked";
+                throw sawtooth::InvalidTransaction(error.str());
+            }
+            if ( *(*parent_it).find("SU") != this->txn->header()->GetValue(
+                sawtooth::TransactionHeaderSignerPublicKey)){
+                std::stringstream error;
+                error << " Parent token" << *current.find("PA") << " subject not matching";
+                throw sawtooth::InvalidTransaction(error.str());
             }
         }
 
