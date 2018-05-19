@@ -21,13 +21,15 @@ import os
 import sys
 import traceback
 import pkg_resources
+import json
 
 from colorlog import ColoredFormatter
 
 from cli.capbac_client import CapBACClient
 from cli.capbac_exceptions import CapBACException
 
-DISTRIBUTION_NAME = 'capbac'
+FAMILY_NAME = 'capbac'
+FAMILY_VERSION = '1.0'
 
 DEFAULT_URL = 'http://rest-api:8008'
 
@@ -55,34 +57,6 @@ def setup_loggers(verbose_level):
     logger.setLevel(logging.DEBUG)
     logger.addHandler(create_console_handler(verbose_level))
 
-def add_issue_parser(subparsers, parent_parser):
-    parser = subparsers.add_parser(
-        'issue',
-        help='issue a capability token',
-        parents=[parent_parser])
-
-    parser.add_argument(
-        'identifier',
-        type=str,
-        help='the token ID')
-
-def create_parent_parser(prog_name):
-    parent_parser = argparse.ArgumentParser(prog=prog_name, add_help=False)
-
-    try:
-        version = pkg_resources.get_distribution(DISTRIBUTION_NAME).version
-    except pkg_resources.DistributionNotFound:
-        version = 'UNKNOWN'
-
-    parent_parser.add_argument(
-        '-V', '--version',
-        action='version',
-        version=(DISTRIBUTION_NAME + ' (Hyperledger Sawtooth) version {}')
-        .format(version),
-        help='display version information')
-
-    return parent_parser
-
 def create_parser(prog_name):
     parent_parser = create_parent_parser(prog_name)
 
@@ -98,6 +72,55 @@ def create_parser(prog_name):
 
     return parser
 
+def create_parent_parser(prog_name):
+    parent_parser = argparse.ArgumentParser(prog=prog_name, add_help=False)
+
+    parent_parser.add_argument(
+        '-V', '--version',
+        action='version',
+        version= FAMILY_NAME + ' (Hyperledger Sawtooth) version ' + FAMILY_VERSION,
+        help='display version information')
+
+    return parent_parser
+
+def add_issue_parser(subparsers, parent_parser):
+    parser = subparsers.add_parser(
+        'issue',
+        help='issue a capability token',
+        parents=[parent_parser])
+
+    parser.add_argument(
+        'capability',
+        type=str,
+        help='the capability token')
+
+def add_revoke_parser(subparsers, parent_parser):
+    parser = subparsers.add_parser(
+        'revoke',
+        help='revoke an issued capability token',
+        parents=[parent_parser])
+
+    parser.add_argument(
+        'capabiltiy',
+        type=str,
+        help='the capability token')
+
+def add_access_parser(subparsers, parent_parser):
+    parser = subparsers.add_parser(
+        'access',
+        help='request an access',
+        parents=[parent_parser])
+
+    parser.add_argument(
+        'capabiltiy',
+        type=str,
+        help='the capability token')
+
+    parser.add_argument(
+        'request',
+        type=str,
+        help='the access request')
+
 def _get_keyfile():
     real_user = getpass.getuser()
     home = os.path.expanduser("~")
@@ -110,13 +133,6 @@ def _get_pubkeyfile(subject):
     key_dir = os.path.join(home, ".sawtooth", "keys")
     return '{}/{}.pub'.format(key_dir, real_user)
 
-def do_issue(args):
-    keyfile = _get_keyfile()
-    identifier= args.identifier
-    client = CapBACClient(baseUrl=DEFAULT_URL, keyFile=keyfile)
-    response = client.issue(identifier)
-    print(response)
-
 def main(prog_name=os.path.basename(sys.argv[0]), args=None):
     if args is None:
         args = sys.argv[1:]
@@ -127,11 +143,22 @@ def main(prog_name=os.path.basename(sys.argv[0]), args=None):
 
     setup_loggers(verbose_level=verbose_level)
 
+    keyfile = _get_keyfile()
+    client = CapBACClient(baseUrl=DEFAULT_URL, keyFile=keyfile)
+
+    capability = json.loads(args.capability)
+
     # Get the commands from cli args and call corresponding handlers
     if args.command == 'issue':
-        do_issue(args)
+        response = client.issue(capability)
+#    elif args.command == 'revoke':
+#        response = client.revoke(capability)
+#    elif args.command == 'access':
+#        response = client.access(capability, request)
     else:
         raise CapBACException("Invalid command: {}".format(args.command))
+
+    print("Response: {}".format(response))
 
 
 def main_wrapper():

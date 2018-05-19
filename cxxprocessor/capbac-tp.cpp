@@ -99,21 +99,21 @@ class CapBACApplicator:  public sawtooth::TransactionApplicator {
 
         if (!capbac_cmd.is_object()) {
             throw sawtooth::InvalidTransaction(
-                "CBOR Object as the encoded command");
+                ": requires CBOR Object as the encoded command");
         }
 
-        auto action_it = capbac_cmd.find("Action");
+        auto action_it = capbac_cmd.find("AC");
         if (action_it == capbac_cmd.end()) {
             throw sawtooth::InvalidTransaction(
-                "Action is required");
+                ": Action is required");
         }
 
         action = *action_it;
 
-        auto cap_it = capbac_cmd.find("Capability");
+        auto cap_it = capbac_cmd.find("CT");
         if (cap_it == capbac_cmd.end()) {
             throw sawtooth::InvalidTransaction(
-                "Capability is required");
+                ": Capability is required");
         }
         cap = *cap_it;
 
@@ -139,7 +139,7 @@ class CapBACApplicator:  public sawtooth::TransactionApplicator {
         // Choose what to do based on action
         if (action == "issue") {
 
-            auto identifier_it = cap.find("Identifier");
+            auto identifier_it = cap.find("ID");
             if (identifier_it == cap.end()) {
                 throw sawtooth::InvalidTransaction(
                     " Capability requires an Identifier");
@@ -148,7 +148,7 @@ class CapBACApplicator:  public sawtooth::TransactionApplicator {
 
             //TODO: capabilty formal validity check
 
-            auto issuer_it = cap.find("Issuer");
+            auto issuer_it = cap.find("IS");
             if (issuer_it == cap.end()) {
                 throw sawtooth::InvalidTransaction(
                     " Capability requires an Issuer");

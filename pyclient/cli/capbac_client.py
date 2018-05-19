@@ -39,6 +39,7 @@ from cli.capbac_exceptions import CapBACException
 
 # The Transaction Family Name
 FAMILY_NAME='capbac'
+FAMILY_VERSION='1.0'
 
 def _sha512(data):
     return hashlib.sha512(data).hexdigest()
@@ -79,10 +80,19 @@ class CapBACClient:
     # 1. Do any additional handling, if required
     # 2. Create a transaction and a batch
     # 2. Send to rest-api
-    def issue(self, identifier):
-        return self._send_transaction(
-            "issue",
-            identifier)
+    def issue(self, capability):
+
+        capability['IS'] = str(self._signer.get_public_key().as_hex())
+
+        # Generate the CBOR encoded payload
+        payload = cbor.dumps({
+            'AC': "issue",
+            'CT': capability
+        })
+
+        identifier = capability['ID']
+
+        return self._send_transaction(payload, [identifier], [identifier])
 
     def _send_request(self,
                       suffix,
@@ -131,26 +141,23 @@ class CapBACClient:
         key_dir = os.path.join(home, ".sawtooth", "keys")
         return '{}/{}.pub'.format(key_dir, real_user)
 
-    def _send_transaction(self, action, identifier):
-        issuer = str(self._signer.get_public_key().as_hex())
+    def _send_transaction(self, payload, input_ids, output_ids):
 
-        # Generate the CBOR encoded payload
-        payload = cbor.dumps({
-            'Action': action,
-            'Capability':{
-                        'Identifier': identifier,
-                        'Issuer': issuer
-            }
-        })
-        # Construct the address
-        address = self._get_address(identifier)
+        # Construct the addresses
+        input_addresses = []
+        for identifier in input_ids:
+            input_addresses.append(self._get_address(identifier))
+
+        output_addresses = []
+        for identifier in output_ids:
+            output_addresses.append(self._get_address(identifier))
 
         header = TransactionHeader(
             signer_public_key=self._signer.get_public_key().as_hex(),
             family_name=FAMILY_NAME,
-            family_version="1.0",
-            inputs=[address],
-            outputs=[address],
+            family_version=FAMILY_VERSION,
+            inputs=input_addresses,
+            outputs=output_addresses,
             dependencies=[],
             payload_sha512=_sha512(payload),
             batcher_public_key=self._signer.get_public_key().as_hex(),
