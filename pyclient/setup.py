@@ -25,7 +25,7 @@ data_files = []
 setup(
     name='capbac-cli',
     version='1.0',
-    description='Sawtooth SimpleWallet Example',
+    description='Sawtooth CapBAC',
     author='kappanneo',
     url='https://github.com/kappanneo/sawtooth-capbac',
     packages=find_packages(),

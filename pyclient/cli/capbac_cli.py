@@ -13,27 +13,25 @@
 # limitations under the License.
 # ------------------------------------------------------------------------------
 
-from __future__ import print_function
 import argparse
 import getpass
 import logging
 import os
 import sys
 import traceback
-import pkg_resources
-import json
 
 from colorlog import ColoredFormatter
 
 from cli.capbac_client import CapBACClient
-from cli.capbac_exceptions import CapBACException
+from cli.capbac_exceptions import CapBACCliException
+from cli.capbac_exceptions import CapBACClientException
 
 FAMILY_NAME = 'capbac'
 FAMILY_VERSION = '1.0'
 
 DEFAULT_URL = 'http://rest-api:8008'
 
-def create_console_handler(verbose_level):
+def create_console_handler(verbose_level=2):
     clog = logging.StreamHandler()
     formatter = ColoredFormatter(
         "%(log_color)s[%(asctime)s %(levelname)-8s%(module)s]%(reset)s "
@@ -49,7 +47,14 @@ def create_console_handler(verbose_level):
         })
 
     clog.setFormatter(formatter)
-    clog.setLevel(logging.DEBUG)
+
+    if verbose_level == 0:
+            clog.setLevel(logging.WARN)
+    elif verbose_level == 1:
+        clog.setLevel(logging.INFO)
+    else:
+        clog.setLevel(logging.DEBUG)
+
     return clog
 
 def setup_loggers(verbose_level):
@@ -57,13 +62,27 @@ def setup_loggers(verbose_level):
     logger.setLevel(logging.DEBUG)
     logger.addHandler(create_console_handler(verbose_level))
 
-# Parsers
+def create_parent_parser(prog_name):
+    parent_parser = argparse.ArgumentParser(prog=prog_name, add_help=False)
+
+    parent_parser.add_argument(
+        '-v', '--verbose',
+        action='count',
+        help='enable more verbose output')
+
+    parent_parser.add_argument(
+        '-V', '--version',
+        action='version',
+        version= 'sawtooth-'+ FAMILY_NAME + ' (Hyperledger Sawtooth) version ' + FAMILY_VERSION,
+        help='display version information')
+
+    return parent_parser
 
 def create_parser(prog_name):
     parent_parser = create_parent_parser(prog_name)
 
     parser = argparse.ArgumentParser(
-        description='Provides subcommands to manage your simple wallet',
+        description='Provides subcommands to manage the access capabilities',
         parents=[parent_parser])
 
     subparsers = parser.add_subparsers(title='subcommands', dest='command')
@@ -71,80 +90,156 @@ def create_parser(prog_name):
     subparsers.required = True
 
     add_issue_parser(subparsers, parent_parser)
+    add_revoke_parser(subparsers, parent_parser)
+    add_validate_parser(subparsers, parent_parser)
 
     return parser
 
-def create_parent_parser(prog_name):
-    parent_parser = argparse.ArgumentParser(prog=prog_name, add_help=False)
-
-    parent_parser.add_argument(
-        '-V', '--version',
-        action='version',
-        version= FAMILY_NAME + ' (Hyperledger Sawtooth) version ' + FAMILY_VERSION,
-        help='display version information')
-
-    return parent_parser
-
 def add_issue_parser(subparsers, parent_parser):
+    message = 'Sends a capbac transaction to store the capability token in the ledger.'
+
     parser = subparsers.add_parser(
         'issue',
-        help='issue a capability token',
-        parents=[parent_parser])
+        parents=[parent_parser],
+        description=message,
+        help='issue a capability token')
 
     parser.add_argument(
         'capability',
         type=str,
-        help='the capability token')
+        help='the capability token as JSON')
+
+    parser.add_argument(
+        '--url',
+        type=str,
+        help='specify URL of REST API')
+
+    parser.add_argument(
+        '--keyfile',
+        type=str,
+        help="identify file containing user's private key")
+
+def do_issue(args):
+    capability  = args.capability
+    client = _get_client(args)
+    response = client.issue(capability)
+    print("Response: {}".format(response))
 
 def add_revoke_parser(subparsers, parent_parser):
+    message = 'Sends a capbac transaction to delete one or more capabilities from the ledger, according to the revocation request (requires a revocation capability).'
+
     parser = subparsers.add_parser(
         'revoke',
-        help='revoke an issued capability token',
-        parents=[parent_parser])
+        parents=[parent_parser],
+        description=message,
+        help='revoke an issued capability token')
 
     parser.add_argument(
-        'capabiltiy',
+        'capability',
         type=str,
-        help='the capability token')
-
-def add_access_parser(subparsers, parent_parser):
-    parser = subparsers.add_parser(
-        'access',
-        help='request an access',
-        parents=[parent_parser])
-
-    parser.add_argument(
-        'capabiltiy',
-        type=str,
-        help='the capability token')
+        help='the revocation capability as JSON')
 
     parser.add_argument(
         'request',
         type=str,
-        help='the access request')
+        help='the request specifing the capabilities to be revoked as JSON')
 
-# Key-getters
+    parser.add_argument(
+        '--url',
+        type=str,
+        help='specify URL of REST API')
 
-def _get_keyfile(subject):
-    home = os.path.expanduser("~")
-    key_dir = os.path.join(home, ".sawtooth", "keys")
-    return '{}/{}.priv'.format(key_dir, subject)
+    parser.add_argument(
+        '--keyfile',
+        type=str,
+        help="identify file containing user's private key")
 
-def _get_pubkeyfile(subject):
-    home = os.path.expanduser("~")
-    key_dir = os.path.join(home, ".sawtooth", "keys")
-    return '{}/{}.pub'.format(key_dir, subject)
-
-# Handlers
-
-def _do_issue(capability):
-
-    keyfile = _get_keyfile(capability['IS'])
-
-    client = CapBACClient(baseUrl=DEFAULT_URL, keyFile=keyfile)
-    response = client.issue(capability)
-
+def do_revoke(args):
+    capability, request = args.capability, args.requeest
+    client = _get_client(args)
+    response = client.revoke(capability, request)
     print("Response: {}".format(response))
+
+def add_validate_parser(subparsers, parent_parser):
+    message = 'Sends a capbac transaction to check if the request matches the capability token stored in the ledger.'
+
+    parser = subparsers.add_parser(
+        'validate',
+        parents=[parent_parser],
+        description=message,
+        help='check if the capability is valid for the request')
+
+    parser.add_argument(
+        'capabiltiy',
+        type=str,
+        help='the capability as JSON')
+
+    parser.add_argument(
+        'request',
+        type=str,
+        help='the access request as JSON')
+
+    parser.add_argument(
+        '--url',
+        type=str,
+        help='specify URL of REST API')
+
+    parser.add_argument(
+        '--keyfile',
+        type=str,
+        help="identify file containing user's private key")
+
+
+def do_validate(args):
+    capability, request = args.capability, args.request
+    client = _get_client(args)
+    response = client.validate(capability, request)
+    print("Response: {}".format(response))
+
+def add_list_parser(subparsers, parent_parser):
+    message = 'List all capability tokens issued for the specified device.'
+
+    parser = subparsers.add_parser(
+        'list',
+        parents=[parent_parser],
+        description=message,
+        help='List all capabilites for a device')
+
+    parser.add_argument(
+        'device',
+        type=str,
+        help='URI of the device')
+
+    parser.add_argument(
+        '--url',
+        type=str,
+        help='specify URL of REST API')
+
+def do_list(args):
+    device = args.device
+    client = _get_client(args)
+    value = client.list(device)
+    print('{}: {}'.format(device, value))
+
+
+def _get_client(args):
+    return CapBACClient(
+        url=DEFAULT_URL if args.url is None else args.url,
+        keyfile=_get_keyfile(args))
+
+
+def _get_keyfile(args):
+    try:
+        if args.keyfile is not None:
+            return args.keyfile
+    except AttributeError:
+        return None
+
+    real_user = getpass.getuser()
+    home = os.path.expanduser("~")
+    key_dir = os.path.join(home, ".sawtooth", "keys")
+
+    return '{}/{}.priv'.format(key_dir, real_user)
 
 # Main
 
@@ -154,46 +249,37 @@ def main(prog_name=os.path.basename(sys.argv[0]), args=None):
     parser = create_parser(prog_name)
     args = parser.parse_args(args)
 
-    verbose_level = 0
-
+    if args.verbose is None:
+        verbose_level = 2
+    else:
+        verbose_level = args.verbose
     setup_loggers(verbose_level=verbose_level)
 
-    try:
-        capability = json.loads(args.capability)
-    except ValueError:
-        raise CapBACException("Invalid capability: not a JSON")
-
-    # capability core check TODO: better
-    if 'ID' not in capability:
-        raise CapBACException("Invalid capability: 'ID' missing (token identifier)")
-    elif 'IS' not in capability:
-        raise CapBACException("Invalid capability: 'IS' missing (uri of issuer)")
-    elif 'SU' not in capability:
-        raise CapBACException("Invalid capability: 'SU' missing (public key of the subject)")
-    elif 'DE' not in capability:
-        raise CapBACException("Invalid capability: 'DE' missing (uri of device)")
+    if not args.command:
+        parser.print_help()
+        sys.exit(1)
 
     # Get the commands from cli args and call corresponding handlers
     if args.command == 'issue':
-        _do_issue(capability)
-#    elif args.command == 'revoke':
-#        response = client.revoke(capability)
-#    elif args.command == 'access':
-#        response = client.access(capability, request)
+        do_issue(args)
+    elif args.command == 'revoke':
+        do_revoke(args)
+    elif args.command == 'validate':
+        do_validate(args)
     else:
-        raise CapBACException("Invalid command: {}".format(args.command))
+        raise CapBACCliException("Invalid command: {}".format(args.command))
 
 
 def main_wrapper():
     try:
         main()
-    except CapBACException as err:
+    except (CapBACCliException, CapBACClientException) as err:
         print("Error: {}".format(err), file=sys.stderr)
         sys.exit(1)
     except KeyboardInterrupt:
         pass
-    except SystemExit as err:
-        raise err
-    except BaseException as err:
+    except SystemExit as e:
+        raise e
+    except:
         traceback.print_exc(file=sys.stderr)
         sys.exit(1)

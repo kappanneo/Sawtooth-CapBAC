@@ -15,19 +15,15 @@
 
 import hashlib
 import base64
-from base64 import b64encode
 import time
-import getpass
 import requests
 import yaml
-import os
 import cbor
 
 from sawtooth_signing import create_context
 from sawtooth_signing import CryptoFactory
 from sawtooth_signing import ParseError
 from sawtooth_signing.secp256k1 import Secp256k1PrivateKey
-from sawtooth_signing.secp256k1 import Secp256k1PublicKey
 
 from sawtooth_sdk.protobuf.transaction_pb2 import TransactionHeader
 from sawtooth_sdk.protobuf.transaction_pb2 import Transaction
@@ -35,45 +31,71 @@ from sawtooth_sdk.protobuf.batch_pb2 import BatchList
 from sawtooth_sdk.protobuf.batch_pb2 import BatchHeader
 from sawtooth_sdk.protobuf.batch_pb2 import Batch
 
-from cli.capbac_exceptions import CapBACException
+from cli.capbac_exceptions import CapBACClientException
 
 # The Transaction Family Name
 FAMILY_NAME='capbac'
 FAMILY_VERSION='1.0'
 
+TOKEN_FORMAT = {
+    'ID': {
+        'description': 'token identifier'
+    },
+    'II': {
+        'description': 'issue istant',
+        'len': 10
+    },
+    'IS': {
+        'description': 'issuer\'s URI'
+    },
+    'SU': {
+        'description': 'subject\'s public key',
+        'len': 64
+    },
+    'DE': {
+        'description': 'device\'s URI'
+    },
+    'SI': {
+        'description': 'issuer\'s signature',
+        'len': 64
+    },
+    'PA': {
+        'description': 'identifier of the parent token'
+    },
+    'NB': {
+        'description': 'not before time',
+        'len': 10
+    },
+    'NA': {
+        'description': 'not after time',
+        'len': 10
+    }
+}
+
 def _sha512(data):
     return hashlib.sha512(data).hexdigest()
 
 class CapBACClient:
-    def __init__(self, baseUrl, keyFile=None):
+    def __init__(self, url, keyfile=None):
+        self.url = url
 
-        self._baseUrl = baseUrl
+        if keyfile is not None:
+            try:
+                with open(keyfile) as fd:
+                    private_key_str = fd.read().strip()
+                    fd.close()
+            except OSError as err:
+                raise CapBACClientException(
+                    'Failed to read private key: {}'.format(str(err)))
 
-        if keyFile is None:
-            self._signer = None
-            return
+            try:
+                private_key = Secp256k1PrivateKey.from_hex(private_key_str)
+            except ParseError as e:
+                raise CapBACClientException(
+                    'Unable to load private key: {}'.format(str(e)))
 
-        try:
-            with open(keyFile) as fd:
-                privateKeyStr = fd.read().strip()
-        except OSError as err:
-            raise CapBACException(
-                'Failed to read private key {}: {}'.format( \
-                    keyFile, str(err)))
-
-        try:
-            privateKey = Secp256k1PrivateKey.from_hex(privateKeyStr)
-        except ParseError as e:
-            raise CapBACException( \
-                'Failed to load private key: {}'.format(str(e)))
-
-        self._signer = CryptoFactory(create_context('secp256k1')) \
-            .new_signer(privateKey)
-
-        self._publicKey = self._signer.get_public_key().as_hex()
-
-        self._address = _sha512(FAMILY_NAME.encode('utf-8'))[0:6] + \
-            _sha512(self._publicKey.encode('utf-8'))[0:64]
+            self._signer = CryptoFactory(
+                create_context('secp256k1')).new_signer(private_key)
 
     # For each valid cli commands in _cli.py file
     # Add methods to:
@@ -83,30 +105,95 @@ class CapBACClient:
 
     def issue(self, capability):
 
-        # Add signature
-        device = capability['DE']
-        identifier = capability['ID']
-        issueIstant = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
+        try:
+            capability = cbor.loads(capability)
+        except:
+            raise CapBACClientException('Invalid capability: serialization failed')
 
-        capability['II'] = issueIstant
-        capability['SI'] = 'sign'#self._signer.sign(device +':'+ identifier +':'+ issueIstant)
+        subset = set(TOKEN_FORMAT) - {'II','IS'}
+        for label in subset:
+            if label not in capability:
+                raise CapBACClientException("Invalid capability: {} missing ({})".format(label,TOKEN_FORMAT[label]['description']))
+            feature = capability[label]
+            if type(feature) != str:
+                raise CapBACClientException("Invalid capability: {} should be a string".format(label))
+            if 'len' in TOKEN_FORMAT[label]:
+                if len(feature) != TOKEN_FORMAT[label]['len']:
+                    raise CapBACClientException("Invalid capability: {} length should be ({})".format(label,TOKEN_FORMAT[label]['len']))
+        for label in capability:
+            if label not in subset:
+                raise CapBACClientException("Invalid capability: unexpected label {}".format(label))
 
-        # Generate the CBOR encoded payload
+        now = int(time.time())
+
+        if now > int(capability['NA']):
+            raise CapBACClientException("Capability already expired")
+
+        capability['II'] = str(now)
+
+        capability['SI'] = self._signer.sign(str(capability))
+
         payload = cbor.dumps({
             'AC': "issue",
             'CT': capability
         })
 
+        return self._send_transaction(payload, capability['DE'])
+
+    def revoke(self, capability, request):
+
+        try:
+            capability = cbor.loads(capability)
+        except:
+            raise CapBACClientException('Invalid capability: serialization failed')
+
+        payload = cbor.dumps({
+            'AC': "revoke",
+            'CT': capability
+        })
+
+        return self._send_transaction(payload, capability['DE'])
+
+    def validate(self, capability, request):
+
+        try:
+            capability = cbor.loads(capability)
+        except:
+            raise CapBACClientException('Invalid capability: serialization failed')
+
+        payload = cbor.dumps({
+            'AC': "revoke",
+            'CT': capability
+        })
+
+        return self._send_transaction(payload, capability['DE'])
+
+
+    def list(self,device):
+
+        payload = cbor.dumps({
+            'AC': "list",
+            'DE': "device"
+        })
+
         return self._send_transaction(payload, device)
+
+    def _get_prefix(self):
+        return _sha512('intkey'.encode('utf-8'))[0:6]
+
+    def _get_address(self, name):
+        prefix = self._get_prefix()
+        game_address = _sha512(name.encode('utf-8'))[64:]
+        return prefix + game_address
 
     def _send_request(self,
                       suffix,
                       data=None,
                       contentType=None):
-        if self._baseUrl.startswith("http://"):
-            url = "{}/{}".format(self._baseUrl, suffix)
+        if self.url.startswith("http://"):
+            url = "{}/{}".format(self.url, suffix)
         else:
-            url = "http://{}/{}".format(self._baseUrl, suffix)
+            url = "http://{}/{}".format(self.url, suffix)
 
         headers = {}
 
@@ -120,31 +207,17 @@ class CapBACClient:
                 result = requests.get(url, headers=headers)
 
             if not result.ok:
-                raise CapBACException("Error {}: {}".format(
+                raise CapBACClientException("Error {}: {}".format(
                     result.status_code, result.reason))
 
         except requests.ConnectionError as err:
-            raise CapBACException(
+            raise CapBACClientException(
                 'Failed to connect to {}: {}'.format(url, str(err)))
 
         except BaseException as err:
-            raise CapBACException(err)
+            raise CapBACClientException(err)
 
         return result.text
-
-    def _get_prefix(self):
-        return _sha512('capbac'.encode('utf-8'))[0:6]
-
-    def _get_address(self, name):
-        prefix = self._get_prefix()
-        game_address = _sha512(name.encode('utf-8'))[64:]
-        return prefix + game_address
-
-    def _get_pubkeyfile(self):
-        real_user = getpass.getuser()
-        home = os.path.expanduser("~")
-        key_dir = os.path.join(home, ".sawtooth", "keys")
-        return '{}/{}.pub'.format(key_dir, real_user)
 
     def _send_transaction(self, payload, device):
 
@@ -175,7 +248,7 @@ class CapBACClient:
 
         return self._send_request(
             "batches", batch_list.SerializeToString(),
-            'application/octet-stream',
+            'application/octet-stream'
         )
 
     def _create_batch_list(self, transactions):
