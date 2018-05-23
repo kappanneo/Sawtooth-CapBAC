@@ -218,8 +218,8 @@ def add_list_parser(subparsers, parent_parser):
 def do_list(args):
     device = args.device
     client = _get_client(args)
-    value = client.list(device)
-    print('{}: {}'.format(device, value))
+    token_list = client.list(device)
+    print(token_list)
 
 
 def _get_client(args):
@@ -260,12 +260,10 @@ def main(prog_name=os.path.basename(sys.argv[0]), args=None):
         sys.exit(1)
 
     # Get the commands from cli args and call corresponding handlers
-    if args.command == 'issue':
-        do_issue(args)
-    elif args.command == 'revoke':
-        do_revoke(args)
-    elif args.command == 'validate':
-        do_validate(args)
+    if   args.command == 'issue':    do_issue(args)
+    elif args.command == 'revoke':   do_revoke(args)
+    elif args.command == 'validate': do_validate(args)
+    elif args.command == 'list':     do_list(args)
     else:
         raise CapBACCliException("Invalid command: {}".format(args.command))
 

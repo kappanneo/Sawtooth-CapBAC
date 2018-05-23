@@ -37,40 +37,51 @@ from cli.capbac_exceptions import CapBACClientException
 FAMILY_NAME='capbac'
 FAMILY_VERSION='1.0'
 
+IDENTIFIER_LENGTH = 4
+
+TIMESTAMP_LENGTH = 10
+
+MAX_URI_LENGTH = 2000
+
 TOKEN_FORMAT = {
     'ID': {
-        'description': 'token identifier'
+        'description': 'token identifier',
+        'len': IDENTIFIER_LENGTH
     },
     'II': {
         'description': 'issue istant',
-        'len': 10
+        'len': TIMESTAMP_LENGTH
     },
     'IS': {
-        'description': 'issuer\'s URI'
+        'description': 'issuer\'s URI',
+        'max_len': MAX_URI_LENGTH
     },
     'SU': {
         'description': 'subject\'s public key',
         'len': 64
     },
     'DE': {
-        'description': 'device\'s URI'
+        'description': 'device\'s URI',
+        'max_len': MAX_URI_LENGTH
     },
     'SI': {
         'description': 'issuer\'s signature',
         'len': 64
     },
     'PA': {
-        'description': 'identifier of the parent token'
+        'description': 'identifier of the parent token',
+        'len': IDENTIFIER_LENGTH
     },
     'NB': {
         'description': 'not before time',
-        'len': 10
+        'len': TIMESTAMP_LENGTH
     },
     'NA': {
         'description': 'not after time',
-        'len': 10
+        'len': TIMESTAMP_LENGTH
     }
 }
+
 
 def _sha512(data):
     return hashlib.sha512(data).hexdigest()
@@ -110,6 +121,7 @@ class CapBACClient:
         except:
             raise CapBACClientException('Invalid capability: serialization failed')
 
+        # check the formal validity of the incomplete token
         subset = set(TOKEN_FORMAT) - {'II','IS'}
         for label in subset:
             if label not in capability:
@@ -119,19 +131,30 @@ class CapBACClient:
                 raise CapBACClientException("Invalid capability: {} should be a string".format(label))
             if 'len' in TOKEN_FORMAT[label]:
                 if len(feature) != TOKEN_FORMAT[label]['len']:
-                    raise CapBACClientException("Invalid capability: {} length should be ({})".format(label,TOKEN_FORMAT[label]['len']))
+                    raise CapBACClientException("Invalid capability: {} length should be {}".format(label,TOKEN_FORMAT[label]['len']))
+            elif 'max_len' in TOKEN_FORMAT[label]:
+                if len(feature) > TOKEN_FORMAT[label]['max_len']:
+                    raise CapBACClientException("Invalid capability: {} length should less than {}".format(label,TOKEN_FORMAT[label]['max_len']))
         for label in capability:
             if label not in subset:
                 raise CapBACClientException("Invalid capability: unexpected label {}".format(label))
 
+        # time interval logical check
+        not_before = int(capability['NB'])
+        not_after = int(capability['NA'])
+        if not_before > not_after:
+            raise CapBACClientException("Invalid capability: incorrect time interval")
+
+        # add issue time
         now = int(time.time())
-
-        if now > int(capability['NA']):
+        if now > not_after:
             raise CapBACClientException("Capability already expired")
-
         capability['II'] = str(now)
 
+        # add signature
         capability['SI'] = self._signer.sign(str(capability))
+
+        # now the token is complete
 
         payload = cbor.dumps({
             'AC': "issue",
@@ -146,13 +169,18 @@ class CapBACClient:
             capability = cbor.loads(capability)
         except:
             raise CapBACClientException('Invalid capability: serialization failed')
+        try:
+            revocation = cbor.loads(request)
+        except:
+            raise CapBACClientException('Invalid request: serialization failed')
 
         payload = cbor.dumps({
             'AC': "revoke",
-            'CT': capability
+            'CT': capability,
+            'RR': revocation
         })
 
-        return self._send_transaction(payload, capability['DE'])
+        return self._send_transaction(payload,capability['DE'])
 
     def validate(self, capability, request):
 
@@ -160,23 +188,34 @@ class CapBACClient:
             capability = cbor.loads(capability)
         except:
             raise CapBACClientException('Invalid capability: serialization failed')
+        try:
+            request = cbor.loads(request)
+        except:
+            raise CapBACClientException('Invalid request: serialization failed')
 
-        payload = cbor.dumps({
-            'AC': "revoke",
-            'CT': capability
-        })
+        result = self._send_request(
+            "state?address={}".format(
+                self._get_prefix()))
 
-        return self._send_transaction(payload, capability['DE'])
+        # check
 
+        return False
 
     def list(self,device):
+        result = self._send_request(
+            "state?address={}".format(
+                self._get_prefix()))
 
-        payload = cbor.dumps({
-            'AC': "list",
-            'DE': "device"
-        })
+        try:
+            encoded_entries = yaml.safe_load(result)["data"]
 
-        return self._send_transaction(payload, device)
+            return [
+                cbor.loads(base64.b64decode(entry["data"]))
+                for entry in encoded_entries
+            ]
+
+        except BaseException:
+            return None
 
     def _get_prefix(self):
         return _sha512('intkey'.encode('utf-8'))[0:6]
