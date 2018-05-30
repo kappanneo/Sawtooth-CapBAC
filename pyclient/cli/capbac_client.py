@@ -18,6 +18,7 @@ import base64
 import time
 import requests
 import yaml
+import json
 import cbor
 
 from sawtooth_signing import create_context
@@ -37,7 +38,7 @@ from cli.capbac_exceptions import CapBACClientException
 FAMILY_NAME='capbac'
 FAMILY_VERSION='1.0'
 
-IDENTIFIER_LENGTH = 4
+IDENTIFIER_LENGTH = 16
 
 TIMESTAMP_LENGTH = 10
 
@@ -46,7 +47,7 @@ MAX_URI_LENGTH = 2000
 TOKEN_FORMAT = {
     'ID': {
         'description': 'token identifier',
-        'len': IDENTIFIER_LENGTH
+        #'len': IDENTIFIER_LENGTH
     },
     'II': {
         'description': 'issue istant',
@@ -58,7 +59,7 @@ TOKEN_FORMAT = {
     },
     'SU': {
         'description': 'subject\'s public key',
-        'len': 64
+        'len': 66
     },
     'DE': {
         'description': 'device\'s URI',
@@ -117,12 +118,12 @@ class CapBACClient:
     def issue(self, capability):
 
         try:
-            capability = cbor.loads(capability)
+            capability = json.loads(capability)
         except:
             raise CapBACClientException('Invalid capability: serialization failed')
 
         # check the formal validity of the incomplete token
-        subset = set(TOKEN_FORMAT) - {'II','IS'}
+        subset = set(TOKEN_FORMAT) - {'II','SI'}
         for label in subset:
             if label not in capability:
                 raise CapBACClientException("Invalid capability: {} missing ({})".format(label,TOKEN_FORMAT[label]['description']))
@@ -152,7 +153,7 @@ class CapBACClient:
         capability['II'] = str(now)
 
         # add signature
-        capability['SI'] = self._signer.sign(str(capability))
+        capability['SI'] = self._signer.sign(str(capability).encode('utf-8'))
 
         # now the token is complete
 
@@ -166,11 +167,11 @@ class CapBACClient:
     def revoke(self, capability, request):
 
         try:
-            capability = cbor.loads(capability)
+            capability = json.loads(capability)
         except:
             raise CapBACClientException('Invalid capability: serialization failed')
         try:
-            revocation = cbor.loads(request)
+            revocation = json.loads(request)
         except:
             raise CapBACClientException('Invalid request: serialization failed')
 
@@ -185,11 +186,11 @@ class CapBACClient:
     def validate(self, capability, request):
 
         try:
-            capability = cbor.loads(capability)
+            capability = json.loads(capability)
         except:
             raise CapBACClientException('Invalid capability: serialization failed')
         try:
-            request = cbor.loads(request)
+            request = json.loads(request)
         except:
             raise CapBACClientException('Invalid request: serialization failed')
 
@@ -218,7 +219,7 @@ class CapBACClient:
             return None
 
     def _get_prefix(self):
-        return _sha512('intkey'.encode('utf-8'))[0:6]
+        return _sha512(FAMILY_NAME.encode('utf-8'))[0:6]
 
     def _get_address(self, name):
         prefix = self._get_prefix()

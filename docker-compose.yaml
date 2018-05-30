@@ -18,7 +18,13 @@ version: '2.1'
 services:
   capbac-processor:
     container_name: capbac-processor
-    image: kappanneo/sawtooth-capbac-tp-cxx:latest
+    build:
+      context: .
+      dockerfile: ./pyprocessor/Dockerfile
+      args:
+        - http_proxy
+        - https_proxy
+        - no_proxy
     depends_on:
       - validator
     volumes:
@@ -26,11 +32,17 @@ services:
 
   capbac-client:
     container_name: capbac-client
-    image: kappanneo/sawtooth-capbac-client-python:latest
+    build:
+      context: .
+      dockerfile: ./pyclient/Dockerfile
+      args:
+        - http_proxy
+        - https_proxy
+        - no_proxy
     environment:
       - 'http_proxy=${http_proxy}'
       - 'https_proxy=${https_proxy}'
-      - 'no_proxy=rest-api,validator,{no_proxy}'
+      - 'no_proxy=rest-api,validator,${no_proxy}'
     volumes:
       - '.:/project/capbac/'
     ports:

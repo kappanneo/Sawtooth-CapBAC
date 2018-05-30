@@ -36,13 +36,8 @@ LOGGER = logging.getLogger(__name__)
 
 FAMILY_NAME = 'capbac'
 FAMILY_VERSION = '1.0'
-
-VALID_ACTIONS = 'issue', 'revoke', 'validate', 'list'
-
-IDENTIFIER_LENGTH = 4
-
+IDENTIFIER_LENGTH = 16
 TIMESTAMP_LENGTH = 10
-
 MAX_URI_LENGTH = 2000
 
 TOKEN_FORMAT = {
@@ -60,7 +55,7 @@ TOKEN_FORMAT = {
     },
     'SU': {
         'description': 'subject\'s public key',
-        'len': 64
+        'len': 66
     },
     'DE': {
         'description': 'device\'s URI',
@@ -68,7 +63,7 @@ TOKEN_FORMAT = {
     },
     'SI': {
         'description': 'issuer\'s signature',
-        'len': 64
+        'len': 128
     },
     'PA': {
         'description': 'identifier of the parent token',
@@ -84,14 +79,18 @@ TOKEN_FORMAT = {
     }
 }
 
-CAPBAC_ADDRESS_PREFIX = hashlib.sha512(
-    FAMILY_NAME.encode('utf-8')).hexdigest()[0:6]
+VALID_ACTIONS = 'issue', 'revoke', 'validate', 'list'
 
+def _sha512(data):
+    return hashlib.sha512(data).hexdigest()
 
-def make_capbac_address(name):
-    return CAPBAC_ADDRESS_PREFIX + hashlib.sha512(
-        name.encode('utf-8')).hexdigest()[-64:]
+def _get_prefix():
+    return _sha512(FAMILY_NAME.encode('utf-8'))[0:6]
 
+def _get_address(name):
+    prefix = _get_prefix()
+    game_address = _sha512(name.encode('utf-8'))[64:]
+    return prefix + game_address
 
 class CapBACTransactionHandler(TransactionHandler):
     @property
@@ -104,7 +103,7 @@ class CapBACTransactionHandler(TransactionHandler):
 
     @property
     def namespaces(self):
-        return [CAPBAC_ADDRESS_PREFIX]
+        return [_get_prefix()]
 
     def apply(self, transaction, context):
         action, capability, request, device = _unpack_transaction(transaction)
@@ -143,10 +142,10 @@ def _unpack_transaction(transaction):
         except AttributeError:
             raise InvalidTransaction('For action "revoke" revocation request is required as "RE" ')
 
-        _validate_request(request)
+        _validate_request(content['RE'])
 
     else:
-        revoccation = None
+        revocation = None
 
     return action, capability, revocation, device
 
@@ -166,10 +165,10 @@ def _validate_capability(capability):
             raise InvalidTransaction("Invalid capability: {} should be a string".format(label))
         if 'len' in TOKEN_FORMAT[label]:
             if len(feature) != TOKEN_FORMAT[label]['len']:
-                raise InvalidTransaction("Invalid capability: {} length should be {}".format(label,TOKEN_FORMAT[label]['len']))
+                raise InvalidTransaction("Invalid capability: {} length should be {} but is {}".format(label,TOKEN_FORMAT[label]['len'],len(feature)))
         elif 'max_len' in TOKEN_FORMAT[label]:
             if len(feature) > TOKEN_FORMAT[label]['max_len']:
-                raise InvalidTransaction("Invalid capability: {} length should less than {}".format(label,TOKEN_FORMAT[label]['max_len']))
+                raise InvalidTransaction("Invalid capability: {} length should less than {} but is {}".format(label,TOKEN_FORMAT[label]['max_len'],len(feature)))
     for label in capability:
         if label not in TOKEN_FORMAT:
             raise InvalidTransaction("Invalid capability: unexpected label {}".format(label))
@@ -190,7 +189,7 @@ def _validate_request(request):
     return
 
 def _get_state_data(device, context):
-    address = make_capbac_address(device)
+    address = _get_address(device)
 
     state_entries = context.get_state([address])
 
@@ -203,7 +202,7 @@ def _get_state_data(device, context):
 
 
 def _set_state_data(device, state, context):
-    address = make_capbac_address(device)
+    address = _get_address(device)
 
     encoded = cbor.dumps(state)
 
@@ -248,7 +247,7 @@ def _do_validate(capability, request, state):
     return state
 
 def _do_list(state):
-    
+    return state
 
 
 def parse_args(args):
@@ -280,7 +279,7 @@ def main(args=None):
     opts = parse_args(args)
     processor = None
     try:
-        processor = TransactionProcessor(url=opts.connect)
+        processor = TransactionProcessor(url='tcp://validator:4004') # shuold be: opts.connect
         log_config = get_log_config(filename="capbac_log_config.toml")
 
         # If no toml, try loading yaml
@@ -305,6 +304,7 @@ def main(args=None):
         processor.add_handler(handler)
 
         processor.start()
+
     except KeyboardInterrupt:
         pass
     except Exception as e:  # pylint: disable=broad-except

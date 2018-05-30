@@ -107,7 +107,7 @@ def add_issue_parser(subparsers, parent_parser):
     parser.add_argument(
         'capability',
         type=str,
-        help='the capability token as JSON')
+        help='capability token as JSON')
 
     parser.add_argument(
         '--url',
@@ -137,12 +137,12 @@ def add_revoke_parser(subparsers, parent_parser):
     parser.add_argument(
         'capability',
         type=str,
-        help='the revocation capability as JSON')
+        help='revocation capability as JSON')
 
     parser.add_argument(
         'request',
         type=str,
-        help='the request specifing the capabilities to be revoked as JSON')
+        help='request specifing the capabilities to be revoked as JSON')
 
     parser.add_argument(
         '--url',
@@ -172,12 +172,12 @@ def add_validate_parser(subparsers, parent_parser):
     parser.add_argument(
         'capabiltiy',
         type=str,
-        help='the capability as JSON')
+        help='capability as JSON')
 
     parser.add_argument(
         'request',
         type=str,
-        help='the access request as JSON')
+        help='access request as JSON')
 
     parser.add_argument(
         '--url',
