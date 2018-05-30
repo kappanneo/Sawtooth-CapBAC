@@ -90,8 +90,7 @@ def create_parser(prog_name):
     subparsers.required = True
 
     add_issue_parser(subparsers, parent_parser)
-    add_revoke_parser(subparsers, parent_parser)
-    add_validate_parser(subparsers, parent_parser)
+    add_list_parser(subparsers,parent_parser)
 
     return parser
 

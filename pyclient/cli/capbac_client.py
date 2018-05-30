@@ -34,20 +34,16 @@ from sawtooth_sdk.protobuf.batch_pb2 import Batch
 
 from cli.capbac_exceptions import CapBACClientException
 
-# The Transaction Family Name
-FAMILY_NAME='capbac'
-FAMILY_VERSION='1.0'
-
+FAMILY_NAME = 'capbac'
+FAMILY_VERSION = '1.0'
 IDENTIFIER_LENGTH = 16
-
 TIMESTAMP_LENGTH = 10
-
 MAX_URI_LENGTH = 2000
 
 TOKEN_FORMAT = {
     'ID': {
         'description': 'token identifier',
-        #'len': IDENTIFIER_LENGTH
+        'len': IDENTIFIER_LENGTH
     },
     'II': {
         'description': 'issue istant',
@@ -67,7 +63,7 @@ TOKEN_FORMAT = {
     },
     'SI': {
         'description': 'issuer\'s signature',
-        'len': 64
+        'len': 128
     },
     'PA': {
         'description': 'identifier of the parent token',

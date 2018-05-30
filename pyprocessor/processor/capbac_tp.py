@@ -15,7 +15,6 @@
 
 import sys
 import argparse
-import pkg_resources
 
 import logging
 import hashlib
@@ -79,7 +78,7 @@ TOKEN_FORMAT = {
     }
 }
 
-VALID_ACTIONS = 'issue', 'revoke', 'validate', 'list'
+VALID_ACTIONS = 'issue', 'revoke', 'validate'
 
 def _sha512(data):
     return hashlib.sha512(data).hexdigest()
@@ -220,8 +219,6 @@ def _do_capbac(action, capability, request, device, state):
         return _do_revoke(capability,request,state)
     if action == 'validate':
         return _do_validate(capability,request,state)
-    if action == 'list':
-        return _do_list(state)
 
 def _do_issue(capability, state):
     identifier = capability['ID']
@@ -244,9 +241,6 @@ def _do_revoke(capability, request, state):
 
 
 def _do_validate(capability, request, state):
-    return state
-
-def _do_list(state):
     return state
 
 
