@@ -53,7 +53,7 @@ Sawtooth transaction family for Capability Based Access Control.
 
 ```bash
 cd sawtooth-capbac
-docker-compose up
+docker-compose up --build
 ```
 
 ## run
