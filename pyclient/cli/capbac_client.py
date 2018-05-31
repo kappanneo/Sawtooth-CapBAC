@@ -201,15 +201,15 @@ class CapBACClient:
     def list(self,device):
         result = self._send_request(
             "state?address={}".format(
-                self._get_prefix()))
+                self._get_address(device)))
 
         try:
             encoded_entries = yaml.safe_load(result)["data"]
 
-            return [
+            return json.dumps([
                 cbor.loads(base64.b64decode(entry["data"]))
                 for entry in encoded_entries
-            ]
+            ], indent=4, sort_keys=True)
 
         except BaseException:
             return None
@@ -217,10 +217,10 @@ class CapBACClient:
     def _get_prefix(self):
         return _sha512(FAMILY_NAME.encode('utf-8'))[0:6]
 
-    def _get_address(self, name):
+    def _get_address(self, device):
         prefix = self._get_prefix()
-        game_address = _sha512(name.encode('utf-8'))[64:]
-        return prefix + game_address
+        device_address = _sha512(device.encode('utf-8'))[64:]
+        return prefix + device_address
 
     def _send_request(self,
                       suffix,

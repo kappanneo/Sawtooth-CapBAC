@@ -79,6 +79,7 @@ TOKEN_FORMAT = {
 }
 
 VALID_ACTIONS = 'issue', 'revoke', 'validate'
+VALIDATOR_DEFAULT_URL = 'tcp://validator:4004'
 
 def _sha512(data):
     return hashlib.sha512(data).hexdigest()
@@ -86,10 +87,10 @@ def _sha512(data):
 def _get_prefix():
     return _sha512(FAMILY_NAME.encode('utf-8'))[0:6]
 
-def _get_address(name):
+def _get_address(device):
     prefix = _get_prefix()
-    game_address = _sha512(name.encode('utf-8'))[64:]
-    return prefix + game_address
+    device_address = _sha512(device.encode('utf-8'))[64:]
+    return prefix + device_address
 
 class CapBACTransactionHandler(TransactionHandler):
     @property
@@ -227,7 +228,7 @@ def _do_issue(capability, state):
 
     if identifier in state:
         raise InvalidTransaction(
-            'Action is "issue", but capability token already exists'
+            'Cannot issue: capability token with ID = {} already exists'.format(identifier)
             )
 
     updated = {k: v for k, v in state.items()}
@@ -250,7 +251,7 @@ def parse_args(args):
 
     parser.add_argument(
         '-C', '--connect',
-        default='tcp://localhost:4004',
+        default=VALIDATOR_DEFAULT_URL,
         help='Endpoint for the validator connection')
 
     parser.add_argument('-v', '--verbose',
@@ -273,7 +274,7 @@ def main(args=None):
     opts = parse_args(args)
     processor = None
     try:
-        processor = TransactionProcessor(url='tcp://validator:4004') # shuold be: opts.connect
+        processor = TransactionProcessor(url=opts.connect)
         log_config = get_log_config(filename="capbac_log_config.toml")
 
         # If no toml, try loading yaml
