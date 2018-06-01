@@ -2,13 +2,26 @@
 
 Sawtooth transaction family for Capability Based Access Control.
 
-## version / token format
+## version format
 
     FAMILY_NAME = 'capbac'
     FAMILY_VERSION = '1.0'
     IDENTIFIER_LENGTH = 16
     TIMESTAMP_LENGTH = 10
     MAX_URI_LENGTH = 2000
+    PUBLICKEY_LENGTH = 66
+    SIGNATURE_LENGTH = 128
+
+    PAYLOAD_FORMAT = {
+        'AC': {
+            'description': 'action',
+            'allowed values': {'issue'}
+        },
+        'OB': {
+            'description': 'action\'s object',
+            'allowed types': {type({})}
+        }
+    }
 
     TOKEN_FORMAT = {
         'ID': {
@@ -19,25 +32,25 @@ Sawtooth transaction family for Capability Based Access Control.
             'description': 'issue istant',
             'len': TIMESTAMP_LENGTH
         },
+        'VR':{
+            'description': 'version',
+            'allowed values': {FAMILY_VERSION}
+        },
         'IS': {
             'description': 'issuer\'s URI',
             'max_len': MAX_URI_LENGTH
         },
         'SU': {
             'description': 'subject\'s public key',
-            'len': 66
+            'len': PUBLICKEY_LENGTH
         },
         'DE': {
             'description': 'device\'s URI',
             'max_len': MAX_URI_LENGTH
         },
-        'SI': {
-            'description': 'issuer\'s signature',
-            'len': 128
-        },
-        'PA': {
-            'description': 'identifier of the parent token',
-            'len': IDENTIFIER_LENGTH
+        'AR': {
+            'description': 'access rights',
+            'allowed types': {list},
         },
         'NB': {
             'description': 'not before time',
@@ -46,6 +59,30 @@ Sawtooth transaction family for Capability Based Access Control.
         'NA': {
             'description': 'not after time',
             'len': TIMESTAMP_LENGTH
+        },
+        'IC': {
+            'description': 'issuer capability (parent token identifier)',
+            'allowed types': {type(None), str},
+            'len': IDENTIFIER_LENGTH
+        },
+        'SI': {
+            'description': 'issuer\'s signature',
+            'len': SIGNATURE_LENGTH
+        }
+    }
+
+    ACCESS_RIGHT_FORMAT = {
+        'AC': {
+            'description': 'permitted action',
+            'allowed values': {'GET','POST','PUT','DELETE'},
+        },
+        'RE': {
+            'description': 'resource',
+            'max_len': MAX_URI_LENGTH
+        },
+        'DD': {
+            'description': 'delegation depth',
+            'allowed types': {int}
         }
     }
 
