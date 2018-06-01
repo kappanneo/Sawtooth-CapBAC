@@ -49,7 +49,7 @@ def create_console_handler(verbose_level=2):
     clog.setFormatter(formatter)
 
     if verbose_level == 0:
-            clog.setLevel(logging.WARN)
+        clog.setLevel(logging.WARN)
     elif verbose_level == 1:
         clog.setLevel(logging.INFO)
     else:
@@ -91,6 +91,8 @@ def create_parser(prog_name):
 
     add_issue_parser(subparsers, parent_parser)
     add_list_parser(subparsers,parent_parser)
+    #add_revoke_parser(subparsers,parent_parser)
+    #add_validate_parser(subparsers,parent_parser)
 
     return parser
 
@@ -104,9 +106,9 @@ def add_issue_parser(subparsers, parent_parser):
         help='issue a capability token')
 
     parser.add_argument(
-        'capability',
+        'token',
         type=str,
-        help='capability token as JSON')
+        help='capability token to be issued (JSON)')
 
     parser.add_argument(
         '--url',
@@ -119,80 +121,8 @@ def add_issue_parser(subparsers, parent_parser):
         help="identify file containing user's private key")
 
 def do_issue(args):
-    capability  = args.capability
     client = _get_client(args)
-    response = client.issue(capability)
-    print("Response: {}".format(response))
-
-def add_revoke_parser(subparsers, parent_parser):
-    message = 'Sends a capbac transaction to delete one or more capabilities from the ledger, according to the revocation request (requires a revocation capability).'
-
-    parser = subparsers.add_parser(
-        'revoke',
-        parents=[parent_parser],
-        description=message,
-        help='revoke an issued capability token')
-
-    parser.add_argument(
-        'capability',
-        type=str,
-        help='revocation capability as JSON')
-
-    parser.add_argument(
-        'request',
-        type=str,
-        help='request specifing the capabilities to be revoked as JSON')
-
-    parser.add_argument(
-        '--url',
-        type=str,
-        help='specify URL of REST API')
-
-    parser.add_argument(
-        '--keyfile',
-        type=str,
-        help="identify file containing user's private key")
-
-def do_revoke(args):
-    capability, request = args.capability, args.requeest
-    client = _get_client(args)
-    response = client.revoke(capability, request)
-    print("Response: {}".format(response))
-
-def add_validate_parser(subparsers, parent_parser):
-    message = 'Sends a capbac transaction to check if the request matches the capability token stored in the ledger.'
-
-    parser = subparsers.add_parser(
-        'validate',
-        parents=[parent_parser],
-        description=message,
-        help='check if the capability is valid for the request')
-
-    parser.add_argument(
-        'capabiltiy',
-        type=str,
-        help='capability as JSON')
-
-    parser.add_argument(
-        'request',
-        type=str,
-        help='access request as JSON')
-
-    parser.add_argument(
-        '--url',
-        type=str,
-        help='specify URL of REST API')
-
-    parser.add_argument(
-        '--keyfile',
-        type=str,
-        help="identify file containing user's private key")
-
-
-def do_validate(args):
-    capability, request = args.capability, args.request
-    client = _get_client(args)
-    response = client.validate(capability, request)
+    response = client.issue(args.token)
     print("Response: {}".format(response))
 
 def add_list_parser(subparsers, parent_parser):
@@ -215,10 +145,69 @@ def add_list_parser(subparsers, parent_parser):
         help='specify URL of REST API')
 
 def do_list(args):
-    device = args.device
     client = _get_client(args)
-    token_list = client.list(device)
+    token_list = client.list(args.device)
     print(token_list)
+
+def add_revoke_parser(subparsers, parent_parser):
+    message = 'Sends a capbac transaction to delete one or more capabilities \
+         from the ledger, according to the revocation request (requires a revocation capability).'
+
+    parser = subparsers.add_parser(
+        'revoke',
+        parents=[parent_parser],
+        description=message,
+        help='revoke an issued capability token')
+
+    parser.add_argument(
+        'request',
+        type=str,
+        help='revocation request (JSON)')
+
+    parser.add_argument(
+        '--url',
+        type=str,
+        help='specify URL of REST API')
+
+    parser.add_argument(
+        '--keyfile',
+        type=str,
+        help="identify file containing user's private key")
+
+def do_revoke(args):
+    client = _get_client(args)
+    response = client.revoke(args.request)
+    print("Response: {}".format(response))
+
+def add_validate_parser(subparsers, parent_parser):
+    message = 'Sends a capbac transaction to check if the request matches the capability token stored in the ledger.'
+
+    parser = subparsers.add_parser(
+        'validate',
+        parents=[parent_parser],
+        description=message,
+        help='check if the capability is valid for the request')
+
+    parser.add_argument(
+        'request',
+        type=str,
+        help='access request to be validated (JSON)')
+
+    parser.add_argument(
+        '--url',
+        type=str,
+        help='specify URL of REST API')
+
+    parser.add_argument(
+        '--keyfile',
+        type=str,
+        help="identify file containing user's private key")
+
+
+def do_validate(args):
+    client = _get_client(args)
+    response = client.validate(args.request)
+    print("Response: {}".format(response))
 
 
 def _get_client(args):
@@ -239,8 +228,6 @@ def _get_keyfile(args):
     key_dir = os.path.join(home, ".sawtooth", "keys")
 
     return '{}/{}.priv'.format(key_dir, real_user)
-
-# Main
 
 def main(prog_name=os.path.basename(sys.argv[0]), args=None):
     if args is None:

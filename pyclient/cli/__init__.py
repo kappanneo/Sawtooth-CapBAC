@@ -16,6 +16,7 @@
 __all__ = [
     'capbac_cli',
     'capbac_client',
-    'capbac_exceptions'
+    'capbac_exceptions',
+    'capbac_version'
 ]
 

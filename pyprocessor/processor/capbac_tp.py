@@ -22,6 +22,9 @@ import hashlib
 import cbor
 import time
 
+from sawtooth_signing import create_context
+from sawtooth_signing.secp256k1 import Secp256k1PublicKey
+
 from sawtooth_sdk.processor.handler import TransactionHandler
 from sawtooth_sdk.processor.exceptions import InvalidTransaction
 from sawtooth_sdk.processor.exceptions import InternalError
@@ -31,54 +34,10 @@ from sawtooth_sdk.processor.log import log_configuration
 from sawtooth_sdk.processor.config import get_log_config
 from sawtooth_sdk.processor.config import get_log_dir
 
+from processor.capbac_version import *
+
 LOGGER = logging.getLogger(__name__)
 
-FAMILY_NAME = 'capbac'
-FAMILY_VERSION = '1.0'
-IDENTIFIER_LENGTH = 16
-TIMESTAMP_LENGTH = 10
-MAX_URI_LENGTH = 2000
-
-TOKEN_FORMAT = {
-    'ID': {
-        'description': 'token identifier',
-        'len': IDENTIFIER_LENGTH
-    },
-    'II': {
-        'description': 'issue istant',
-        'len': TIMESTAMP_LENGTH
-    },
-    'IS': {
-        'description': 'issuer\'s URI',
-        'max_len': MAX_URI_LENGTH
-    },
-    'SU': {
-        'description': 'subject\'s public key',
-        'len': 66
-    },
-    'DE': {
-        'description': 'device\'s URI',
-        'max_len': MAX_URI_LENGTH
-    },
-    'SI': {
-        'description': 'issuer\'s signature',
-        'len': 128
-    },
-    'PA': {
-        'description': 'identifier of the parent token',
-        'len': IDENTIFIER_LENGTH
-    },
-    'NB': {
-        'description': 'not before time',
-        'len': TIMESTAMP_LENGTH
-    },
-    'NA': {
-        'description': 'not after time',
-        'len': TIMESTAMP_LENGTH
-    }
-}
-
-VALID_ACTIONS = 'issue', 'revoke', 'validate'
 VALIDATOR_DEFAULT_URL = 'tcp://validator:4004'
 
 def _sha512(data):
@@ -106,87 +65,103 @@ class CapBACTransactionHandler(TransactionHandler):
         return [_get_prefix()]
 
     def apply(self, transaction, context):
-        action, capability, request, device = _unpack_transaction(transaction)
+        action, obj, device, capability, subject = _unpack_and_verify(transaction)
 
+        # State retrival
         state = _get_state_data(device, context)
 
-        updated = _do_capbac(action, capability, request, device, state)
+        updated = _do_capbac(action, obj, capability, subject, state)
 
         _set_state_data(device, updated, context)
 
-def _unpack_transaction(transaction):
+def _unpack_and_verify(transaction):
+
+    sender_key_str = transaction.header.signer_public_key
+
     try:
-        content = cbor.loads(transaction.payload)
+        payload = cbor.loads(transaction.payload)
     except:
         raise InvalidTransaction('Invalid payload serialization')
 
-    try:
-        action = content['AC']
-    except AttributeError:
-        raise InvalidTransaction('Action is required as "AC" ')
+    _check_format(payload,"payload",PAYLOAD_FORMAT)
 
-    _validate_action(action)
+    action = payload['AC']
+    obj = payload['OB']
 
-    try:
-        capability = content['CT']
-    except AttributeError:
-        raise InvalidTransaction('Capability token is required as "CT" ')
+    if action == 'issue':
 
-    _validate_capability(capability)
+        _check_format(obj,'capability token',TOKEN_FORMAT)
 
-    device = capability['DE']
-
-    if action == 'revoke':
+        # time interval logical check
         try:
-            revocation = content['RR']
-        except AttributeError:
-            raise InvalidTransaction('For action "revoke" revocation request is required as "RE" ')
+            not_before = int(obj['NB'])
+            not_after =  int(obj['NA'])
+        except:
+            raise InvalidTransaction('Invalid token: timestamp not a number')
 
-        _validate_request(content['RE'])
+        if not_before > not_after:
+            raise InvalidTransaction("Invalid token: incorrect time interval")
 
-    else:
-        revocation = None
+        # check if expired
+        now = int(time.time())
+        if now >= not_after:
+            raise InvalidTransaction("Invalid token: token expired")
 
-    return action, capability, revocation, device
+        capability = obj['IC']
+        if not capability: # only allowed if root token
+            if obj['SU'] != sender_key_str:
+                raise InvalidTransaction(
+                    'Invalid capability: "IC" cannot be null for non-root tokens.')
 
+    signature = obj.pop('SI')
 
-def _validate_action(action):
-    if action not in VALID_ACTIONS:
-        raise InvalidTransaction('Action must be one of: {}'.format(str(VALID_ACTIONS)))
+    _check_signture(obj,signature,sender_key_str)
 
-def _validate_capability(capability):
+    device = obj.pop('DE')
 
-    # check the formal validity of the complete token
-    for label in TOKEN_FORMAT:
-        if label not in capability:
-            raise InvalidTransaction("Invalid capability: {} missing ({})".format(label,TOKEN_FORMAT[label]['description']))
-        feature = capability[label]
-        if not isinstance(feature, str):
-            raise InvalidTransaction("Invalid capability: {} should be a string".format(label))
-        if 'len' in TOKEN_FORMAT[label]:
-            if len(feature) != TOKEN_FORMAT[label]['len']:
-                raise InvalidTransaction("Invalid capability: {} length should be {} but is {}".format(label,TOKEN_FORMAT[label]['len'],len(feature)))
-        elif 'max_len' in TOKEN_FORMAT[label]:
-            if len(feature) > TOKEN_FORMAT[label]['max_len']:
-                raise InvalidTransaction("Invalid capability: {} length should less than {} but is {}".format(label,TOKEN_FORMAT[label]['max_len'],len(feature)))
-    for label in capability:
-        if label not in TOKEN_FORMAT:
-            raise InvalidTransaction("Invalid capability: unexpected label {}".format(label))
+    return action, obj, device, capability, sender_key_str
 
-    # time interval logical check
-    not_before = int(capability['NB'])
-    not_after = int(capability['NA'])
-    if not_before > not_after:
-        raise InvalidTransaction("Invalid capability: incorrect time interval")
+def _check_signture(obj,signature,sender_key_str):
+    publicKey = Secp256k1PublicKey.from_hex(sender_key_str)
+    token_string = str(cbor.dumps(obj,sort_keys=True)).encode('utf-8')
+    LOGGER.info(token_string)
+    if not create_context('secp256k1').verify(signature,token_string,publicKey):
+        raise InvalidTransaction('Invalid signature.')
 
-    # add issue time
-    now = int(time.time())
-    if now > not_after:
-        raise InvalidTransaction("Invalid capability: capability expired")
-
-
-def _validate_request(request):
-    return
+def _check_format(dictionary,name,dictionary_format,subset=None):
+    if subset is None:
+        subset = set(dictionary_format)
+    for label in subset:
+        if label not in dictionary:
+            raise InvalidTransaction("Invalid {}: {} missing ({})"
+            .format(name,label,dictionary_format[label]['description']))
+        feature = dictionary[label]
+        if 'allowed values' in dictionary_format[label]:
+            if feature not in dictionary_format[label]['allowed values']:
+                raise InvalidTransaction(
+                "Invalid {}: {} value should be one the following: {}"
+                .format(name,label,dictionary_format[label]['allowed values']))
+        elif 'allowed types' in dictionary_format[label]:
+            if type(feature) not in dictionary_format[label]['allowed types']:
+                raise InvalidTransaction(
+                "Invalid {}: {} type not allowed".format(name,label))
+        elif type(feature) == str: # string allowed by default
+            if 'len' in dictionary_format[label]:
+                if len(feature) != dictionary_format[label]['len']:
+                    raise InvalidTransaction(
+                        "Invalid {}: {} length should be {}"
+                        .format(name,label,dictionary_format[label]['len']))
+            elif 'max_len' in dictionary_format[label]:
+                if len(feature) > dictionary_format[label]['max_len']:
+                    raise InvalidTransaction(
+                        "Invalid {}: {} length should less than {}"
+                        .format(name,label,dictionary_format[label]['max_len']))
+        else:
+            raise InvalidTransaction(
+                "Invalid {}: {} should be a string".format(name,label))
+    for label in dictionary:
+        if label not in subset:
+            raise InvalidTransaction("Invalid {}: unexpected label {}".format(name,label))
 
 def _get_state_data(device, context):
     address = _get_address(device)
@@ -212,36 +187,75 @@ def _set_state_data(device, state, context):
         raise InternalError('State error')
 
 
-def _do_capbac(action, capability, request, device, state):
-
+def _do_capbac(action, obj, capability, subject, state):
     if action == 'issue':
-        return _do_issue(capability,state)
-    if action == 'revoke':
-        return _do_revoke(capability,request,state)
-    if action == 'validate':
-        return _do_validate(capability,request,state)
+        return _do_issue(obj, capability, subject, state)
 
-def _do_issue(capability, state):
-    identifier = capability['ID']
+
+def _do_issue(token, parent, subject, state):
+    identifier = token.pop('ID')
     msg = 'Issuing capbabiltity token with ID: {}'.format(identifier)
     LOGGER.debug(msg)
 
     if identifier in state:
         raise InvalidTransaction(
-            'Cannot issue: capability token with ID = {} already exists'.format(identifier)
-            )
+            'Cannot issue: capability token with ID = {} already exists'
+            .format(identifier))
 
-    updated = {k: v for k, v in state.items()}
-    updated[identifier] = capability
+    now = int(time.time())
+    LOGGER.debug('reformat access rights')
+    # reformat access rights
+    new_format = {}
+    for access_right in token['AR']:
+        new_format[access_right['RE']] = {access_right["AC"]:access_right["DD"]}
+    token['AR'] = new_format
+    LOGGER.debug('check authorization')
+    # check authorization
+    if parent != None:
+        if parent not in state:
+            raise InvalidTransaction(
+                'Cannot issue: no parent capability token with ID = {}'.format(parent))
+        if state[parent]['SU'] != subject:
+            raise InvalidTransaction('Cannot issue: issuer is not the subject of parent capability')
 
-    return updated
+    LOGGER.debug('delegation chain check')
+    # delegation chain check
+    current_token = token
+    while parent != None:
+        if parent not in state:
+            raise InvalidTransaction(
+                'Cannot issue: no parent capability token with ID = {}'.format(parent))
+        parent_token = state[parent]
 
+        # check if expired
+        if now >= int(parent_token['NA']):
+            raise InvalidTransaction(
+                'Cannot issue: parent capability token with ID = {} expired'
+                .format(parent))
 
-def _do_revoke(capability, request, state):
-    return state
+        # check access rights
+        for resource in current_token["AR"]:
+            if resource not in parent_token["AR"]:
+                raise InvalidTransaction(
+                    'Cannot issue: resource {} not authorized in parent token ID = {}'
+                    .format(resource, parent))
+            for action in current_token["AR"][resource]:
+                if action not in parent_token["AR"][resource]:
+                    raise InvalidTransaction(
+                        'Cannot issue: action {} not authorized for resource {} in parent token ID = {}'
+                        .format(action,resource, parent))
+                if not current_token["AR"][resource][action] < parent_token["AR"][resource][action]:
+                    raise InvalidTransaction(
+                        'Cannot issue: delegation should be less than parent for action {},\
+                         resource {}, parent token ID = {}'
+                        .format(action,resource, parent))
 
+        # next
+        current_token = parent_token;
+        parent = current_token["IC"]
 
-def _do_validate(capability, request, state):
+    state[identifier] = token
+
     return state
 
 
@@ -288,7 +302,7 @@ def main(args=None):
             # use the transaction processor zmq identity for filename
             log_configuration(
                 log_dir=log_dir,
-                name="capbac-" + str(processor.zmq_id)[2:-1])
+                name=FAMILY_NAME+ "-" + str(processor.zmq_id)[2:-1])
 
         init_console_logging(verbose_level=opts.verbose)
 
