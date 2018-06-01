@@ -78,20 +78,29 @@ capbac issue <token as JSON>
 
 Example of token to be issued: (signature and timestamp are added by the client)
 
-    {
-        "ID": "0123456789abcdef",
-        "IS": "root@raspi",
-        "SU": "0256fc4f4705582d591bb4a636da729e00d77b17dd351587d07bbeefea5dc636d7",
-        "DE": "raspi",
-        "NB": "1525691114",
-        "NA": "1530691114",
-        "PA": "0123456789abcdef"
-    }
+        {
+            "ID": "0123456789abcdef",
+            "IS": "root@raspi",
+            "SU": "0271469bea00095cecd2449df027b751dacfd4686d6976aa399d8269ded79d8426",
+            "DE": "raspi",
+            "AR": [{
+                "AC": "GET",
+                "RE": "lucky",
+                "DD": 4
+            }, {
+                "AC": "PUT",
+                "RE": "dispenser",
+                "DD": 3
+            }],
+            "NB": "1525691114",
+            "NA": "1530691114",
+            "IC": null
+        }
 
 Corresponding command:
 
 ```bash
-capbac issue '{"ID":"0123456789abcdef","IS":"root@raspi","SU":"0256fc4f4705582d591bb4a636da729e00d77b17dd351587d07bbeefea5dc636d7","DE":"raspi","NB":"1525691114","NA":"1530691114","PA":"0123456789abcdef"}'
+capbac issue '{"ID":"0123456789abcdef","IS":"root@raspi","SU":"0271469bea00095cecd2449df027b751dacfd4686d6976aa399d8269ded79d8426","DE":"raspi","AR":[{"AC":"GET","RE":"lucky","DD":4},{"AC":"PUT","RE":"dispenser","DD":3}],"NB":"1525691114","NA":"1530691114","IC":null}'
 ```
 
 ### list subcommand
