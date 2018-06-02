@@ -110,34 +110,71 @@ sawtooth keygen # create RSA key pair for authentication
 ### issue subcommand
 
 ```bash
-capbac issue <token as JSON>
+capbac issue [--root] <token as JSON>
 ```
 
-Example of token to be issued: (signature and timestamp are added by the client)
+Example of root token to be issued: (subject, issuer capability,signature and timestamp are added by the client)
 
-        {
-            "ID": "0123456789abcdef",
-            "IS": "root@raspi",
-            "SU": "0271469bea00095cecd2449df027b751dacfd4686d6976aa399d8269ded79d8426",
-            "DE": "raspi",
-            "AR": [{
-                "AC": "GET",
-                "RE": "lucky",
-                "DD": 4
-            }, {
-                "AC": "PUT",
-                "RE": "dispenser",
-                "DD": 3
-            }],
-            "NB": "1525691114",
-            "NA": "1530691114",
-            "IC": null
-        }
+    {
+        "ID": "0123456789abcdef",
+        "IS": "root@raspi",
+        "DE": "raspi",
+        "AR": [{
+            "AC": "GET",
+            "RE": "lucky",
+            "DD": 4
+        }, {
+            "AC": "PUT",
+            "RE": "dispenser",
+            "DD": 3
+        }],
+        "NB": "1525691114",
+        "NA": "1530691114"
+    }
 
 Corresponding command:
 
 ```bash
-capbac issue '{"ID":"0123456789abcdef","IS":"root@raspi","SU":"0271469bea00095cecd2449df027b751dacfd4686d6976aa399d8269ded79d8426","DE":"raspi","AR":[{"AC":"GET","RE":"lucky","DD":4},{"AC":"PUT","RE":"dispenser","DD":3}],"NB":"1525691114","NA":"1530691114","IC":null}'
+capbac issue --root '{"ID":"0123456789abcdef","IS":"root@raspi","DE":"raspi","AR":[{"AC":"GET","RE":"lucky","DD":4},{"AC":"PUT","RE":"dispenser","DD":3}],"NB":"1525691114","NA":"1530691114"}'
+```
+
+Example of capability dependant on the previous one: (signature and timestamp sill added by the client)
+
+    {
+        "ID": "0123456789abcde1",
+        "IS": "root@raspi",
+        "SU": "0271469bea00095cecd2449df027b751dacfd4686d6976aa399d8269ded79d8426",
+        "DE": "raspi",
+        "AR": [{
+            "AC": "GET",
+            "RE": "lucky",
+            "DD": 3
+        }, {
+            "AC": "PUT",
+            "RE": "dispenser",
+            "DD": 0
+        }],
+        "NB": "1525691114",
+        "NA": "1530691114",
+        "IC": "0123456789abcdef"
+    }
+    
+Corresponding command:
+```bash
+capbac issue '{"ID":"0123456789abcde1","IS":"root@raspi","SU":"0271469bea00095cecd2449df027b751dacfd4686d6976aa399d8269ded79d8426","DE":"raspi","AR":[{"AC":"GET","RE":"lucky","DD":3},{"AC":"PUT","RE":"dispenser","DD":0}],"NB":"1525691114","NA":"1530691114","IC":"0123456789abcdef"}'
+```
+
+For testing purposes we ca create a new sawtooth identity:
+```bash
+sawtooth keygen subject
+```
+The public key for the dependant capabilty:
+```bash
+cat /root/.sawtooth/keys/subject.pub
+```
+To use the client as subject:
+```bash
+capbac <subcommand> --keyfile /root/.sawtooth/keys/subject.priv
 ```
 
 ### list subcommand
