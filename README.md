@@ -138,7 +138,7 @@ Corresponding command:
 capbac issue --root '{"ID":"0123456789abcdef","IS":"root@raspi","DE":"raspi","AR":[{"AC":"GET","RE":"lucky","DD":4},{"AC":"PUT","RE":"dispenser","DD":3}],"NB":"1525691114","NA":"1530691114"}'
 ```
 
-Example of capability dependant on the previous one: (signature and timestamp sill added by the client)
+Example of capability dependant on the previous one: (signature and timestamp still added by the client)
 
     {
         "ID": "0123456789abcde1",
