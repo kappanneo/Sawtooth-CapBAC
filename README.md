@@ -164,7 +164,7 @@ Corresponding command:
 capbac issue '{"ID":"0123456789abcde1","IS":"root@raspi","SU":"0271469bea00095cecd2449df027b751dacfd4686d6976aa399d8269ded79d8426","DE":"raspi","AR":[{"AC":"GET","RE":"lucky","DD":3},{"AC":"PUT","RE":"dispenser","DD":0}],"NB":"1525691114","NA":"1530691114","IC":"0123456789abcdef"}'
 ```
 
-For testing purposes we ca create a new sawtooth identity:
+For testing purposes we can create a new sawtooth identity:
 ```bash
 sawtooth keygen subject
 ```
