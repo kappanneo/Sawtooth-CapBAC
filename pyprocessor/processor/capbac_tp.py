@@ -92,6 +92,9 @@ def _unpack_and_verify(transaction):
 
         _check_format(obj,'capability token',TOKEN_FORMAT)
 
+        # version is already checked and not required anymore
+        obj.pop('VR')
+
         # time interval logical check
         try:
             not_before = int(obj['NB'])

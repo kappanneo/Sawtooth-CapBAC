@@ -104,7 +104,7 @@ class CapBACClient:
     # 2. Create a transaction and a batch
     # 2. Send to rest-api
 
-    def issue(self, token):
+    def issue(self, token, is_root):
 
         try:
             token = json.loads(token)
@@ -113,6 +113,8 @@ class CapBACClient:
 
         # check the formal validity of the incomplete token
         subset = set(TOKEN_FORMAT) - {'II','SI','VR'}
+        if is_root: subset -= {'IC','SU'}
+
         _check_format(token,'token',TOKEN_FORMAT,subset)
 
         for access_right in token['AR']:
@@ -137,9 +139,14 @@ class CapBACClient:
             raise CapBACClientException("token already expired")
         token['II'] = str(now)
 
+        LOGGER.debug(self._signer.get_public_key().as_hex())
+        if is_root:
+            token['IC'] = None
+            token['SU'] = self._signer.get_public_key().as_hex()
+
         # add signature
         cap_string = str(cbor.dumps(token,sort_keys=True)).encode('utf-8')
-        LOGGER.info(cap_string)
+        LOGGER.debug(cap_string)
         token['SI'] = self._signer.sign(cap_string)
 
         # now the token is complete

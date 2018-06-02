@@ -106,6 +106,11 @@ def add_issue_parser(subparsers, parent_parser):
         help='issue a capability token')
 
     parser.add_argument(
+        '-r','--root',
+        action='store_true',
+        help='specify that the capability token to be issued is a root capability')
+
+    parser.add_argument(
         'token',
         type=str,
         help='capability token to be issued (JSON)')
@@ -122,7 +127,7 @@ def add_issue_parser(subparsers, parent_parser):
 
 def do_issue(args):
     client = _get_client(args)
-    response = client.issue(args.token)
+    response = client.issue(args.token,args.root)
     print("Response: {}".format(response))
 
 def add_list_parser(subparsers, parent_parser):
