@@ -25,9 +25,7 @@ from colorlog import ColoredFormatter
 from cli.capbac_client import CapBACClient
 from cli.capbac_exceptions import CapBACCliException
 from cli.capbac_exceptions import CapBACClientException
-
-FAMILY_NAME = 'capbac'
-FAMILY_VERSION = '1.0'
+from cli.capbac_version import *
 
 DEFAULT_URL = 'http://rest-api:8008'
 

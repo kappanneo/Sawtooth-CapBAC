@@ -92,9 +92,6 @@ def _unpack_and_verify(transaction):
 
         _check_format(obj,'capability token',TOKEN_FORMAT)
 
-        # version is already checked and not required anymore
-        obj.pop('VR')
-
         # time interval logical check
         try:
             not_before = int(obj['NB'])
@@ -256,6 +253,9 @@ def _do_issue(token, parent, subject, state):
         # next
         current_token = parent_token;
         parent = current_token["IC"]
+
+    # version is already checked and not required anymore
+    token.pop('VR')
 
     state[identifier] = token
 
