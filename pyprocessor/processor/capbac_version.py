@@ -21,10 +21,12 @@ MAX_URI_LENGTH = 2000
 PUBLICKEY_LENGTH = 66
 SIGNATURE_LENGTH = 128
 
+REQUEST_ACTIONS = {'GET','POST','PUT','DELETE'}
+
 PAYLOAD_FORMAT = {
     'AC': {
         'description': 'action',
-        'allowed values': {'issue'}
+        'allowed values': {'issue','revoke'}
     },
     'OB': {
         'description': 'action\'s object',
@@ -83,7 +85,7 @@ TOKEN_FORMAT = {
 ACCESS_RIGHT_FORMAT = {
     'AC': {
         'description': 'permitted action',
-        'allowed values': {'GET','POST','PUT','DELETE'},
+        'allowed values': REQUEST_ACTIONS,
     },
     'RE': {
         'description': 'resource',
@@ -92,5 +94,72 @@ ACCESS_RIGHT_FORMAT = {
     'DD': {
         'description': 'delegation depth',
         'allowed types': {int}
+    }
+}
+
+REVOCATION_FORMAT = {
+    'ID': {
+        'description': 'identifier of the revoked token',
+        'len': IDENTIFIER_LENGTH
+    },
+    'II': {
+        'description': 'issue istant',
+        'len': TIMESTAMP_LENGTH
+    },
+    'VR':{
+        'description': 'version',
+        'allowed values': {FAMILY_VERSION}
+    },
+    'IS': {
+        'description': 'issuer\'s URI',
+        'max_len': MAX_URI_LENGTH
+    },
+    'DE': {
+        'description': 'device\'s URI',
+        'max_len': MAX_URI_LENGTH
+    },
+    'RT': {
+        'description': 'revocation type',
+        'allowed values': {'ICO','ALL','DCO'}
+    },
+    'IC': {
+        'description': 'issuer capability',
+        'allowed types': {type(None), str},
+        'len': IDENTIFIER_LENGTH
+    },
+    'SI': {
+        'description': 'issuer\'s signature',
+        'len': SIGNATURE_LENGTH
+    }
+}
+
+VALIDATION_FORMAT = {
+    'II': {
+        'description': 'issue istant',
+        'len': TIMESTAMP_LENGTH
+    },
+    'VR':{
+        'description': 'version',
+        'allowed values': {FAMILY_VERSION}
+    },
+    'DE': {
+        'description': 'device\'s URI',
+        'max_len': MAX_URI_LENGTH
+    },
+    'AC': {
+        'description': 'requested action',
+        'allowed values': REQUEST_ACTIONS,
+    },
+    'RE': {
+        'description': 'resource',
+        'max_len': MAX_URI_LENGTH
+    },
+    'IC': {
+        'description': 'requester\'s capability',
+        'len': IDENTIFIER_LENGTH
+    },
+    'SI': {
+        'description': 'requester\'s signature',
+        'len': SIGNATURE_LENGTH
     }
 }

@@ -31,6 +31,7 @@ setup(
     packages=find_packages(),
     install_requires=[
         'aiohttp',
+        'aiocoap'
         'colorlog',
         'protobuf',
         'sawtooth-sdk',

@@ -26,6 +26,7 @@ from sawtooth_signing import create_context
 from sawtooth_signing import CryptoFactory
 from sawtooth_signing import ParseError
 from sawtooth_signing.secp256k1 import Secp256k1PrivateKey
+from sawtooth_signing.secp256k1 import Secp256k1PublicKey
 
 from sawtooth_sdk.protobuf.transaction_pb2 import TransactionHeader
 from sawtooth_sdk.protobuf.transaction_pb2 import Transaction
@@ -139,14 +140,12 @@ class CapBACClient:
             raise CapBACClientException("token already expired")
         token['II'] = str(now)
 
-        LOGGER.debug(self._signer.get_public_key().as_hex())
         if is_root:
             token['IC'] = None
             token['SU'] = self._signer.get_public_key().as_hex()
 
         # add signature
         cap_string = str(cbor.dumps(token,sort_keys=True)).encode('utf-8')
-        LOGGER.debug(cap_string)
         token['SI'] = self._signer.sign(cap_string)
 
         # now the token is complete
@@ -158,7 +157,45 @@ class CapBACClient:
 
         return self._send_transaction(payload, token['DE'])
 
+    def revoke(self, revocation):
+
+        try:
+            revocation = json.loads(revocation)
+        except:
+            raise CapBACClientException('Invalid revocation: serialization failed')
+
+        # check the formal validity of the incomplete revocation
+        subset = set(REVOCATION_FORMAT) - {'II','SI','VR'}
+
+        _check_format(revocation,'revocation',REVOCATION_FORMAT,subset)
+
+        # add version
+        revocation['VR'] = FAMILY_VERSION
+
+        # add issue time
+        now = int(time.time())
+        revocation['II'] = str(now)
+
+        # add signature
+        cap_string = str(cbor.dumps(revocation,sort_keys=True)).encode('utf-8')
+        revocation['SI'] = self._signer.sign(cap_string)
+
+        # now the revocation request is complete
+
+        payload = cbor.dumps({
+            'AC': "revoke",
+            'OB': revocation
+        })
+
+        return self._send_transaction(payload, revocation['DE'])
+
     def list(self,device):
+
+        if len(device) > MAX_URI_LENGTH:
+            raise CapBACClientException(
+                'Invalid URI: max length exceeded, should be less than {}'
+                .format(MAX_URI_LENGTH))
+
         result = self._send_request(
             "state?address={}".format(
                 self._get_address(device)))
@@ -166,13 +203,118 @@ class CapBACClient:
         try:
             encoded_entries = yaml.safe_load(result)["data"]
 
-            return json.dumps([
+            data_list = [
                 cbor.loads(base64.b64decode(entry["data"]))
                 for entry in encoded_entries
-            ], indent=4, sort_keys=True)
+            ]
+
+            return json.dumps({
+                x:y[x] for y in data_list for x in y
+            }, indent=4, sort_keys=True)
 
         except BaseException:
             return None
+
+    def validate(self,request):
+
+        try:
+            request = json.loads(request)
+        except:
+            raise CapBACClientException('Invalid request: serialization failed')
+
+        _check_format(request,"request",VALIDATION_FORMAT)
+
+        # state retrival
+        device = request['DE']
+        result = self._send_request(
+            "state?address={}".format(
+                self._get_address(device)))
+
+        try:
+            encoded_entries = yaml.safe_load(result)["data"]
+
+            data_list =  [
+                cbor.loads(base64.b64decode(entry["data"]))
+                for entry in encoded_entries
+            ]
+
+            state = {x:y[x] for y in data_list for x in y}
+
+        except BaseException:
+            return None
+
+        LOGGER.info('checking authorization')
+        # check authorization
+        capability = request['IC']
+
+        if capability not in state:
+            return False
+
+        LOGGER.info('checking delegation chain')
+        # delegation chain check
+        now = int(time.time())
+        resource = request['RE']
+        action = request['AC']
+
+        current_token = state[capability]
+        parent = current_token['IC']
+        while parent != None:
+            if parent not in state:
+                raise BaseException
+            parent_token = state[parent]
+
+            # check time interval
+            if now >= int(parent_token['NA']):
+                return False
+            if now < int(parent_token['NB']):
+                return False
+
+            # check access rights
+            if resource not in parent_token["AR"]:
+                return False
+            if action not in parent_token["AR"][resource]:
+                return False
+
+            # next
+            current_token = parent_token
+            parent = current_token['IC']
+
+        LOGGER.info('checking signature')
+        # check signature
+        signature = request.pop('SI')
+        if not create_context('secp256k1').verify(
+            signature,
+            str(cbor.dumps(request,sort_keys=True)).encode('utf-8'),
+            Secp256k1PublicKey.from_hex(state[capability]['SU'])
+            ):
+            return False
+
+        return True
+
+    def submit(self, request):
+
+        try:
+            request = json.loads(request)
+        except:
+            raise CapBACClientException('Invalid request: serialization failed')
+
+        # check the formal validity of the incomplete access request
+        subset = set(VALIDATION_FORMAT) - {'II','SI','VR'}
+
+        _check_format(request,'request',VALIDATION_FORMAT,subset)
+
+        # add version
+        request['VR'] = FAMILY_VERSION
+
+        # add issue time
+        now = int(time.time())
+        request['II'] = str(now)
+
+        # add signature
+        req_string = str(cbor.dumps(request,sort_keys=True)).encode('utf-8')
+        request['SI'] = self._signer.sign(req_string)
+
+        return json.dumps(request)
 
     def _get_prefix(self):
         return _sha512(FAMILY_NAME.encode('utf-8'))[0:6]

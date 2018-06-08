@@ -65,12 +65,12 @@ class CapBACTransactionHandler(TransactionHandler):
         return [_get_prefix()]
 
     def apply(self, transaction, context):
-        action, obj, device, capability, subject = _unpack_and_verify(transaction)
+        action, obj, device, capability, sender = _unpack_and_verify(transaction)
 
-        # State retrival
+        # State retrival and update
         state = _get_state_data(device, context)
 
-        updated = _do_capbac(action, obj, capability, subject, state)
+        updated = _do_capbac(action, obj, capability, sender, state)
 
         _set_state_data(device, updated, context)
 
@@ -113,18 +113,23 @@ def _unpack_and_verify(transaction):
                 raise InvalidTransaction(
                     'Invalid capability: "IC" cannot be null for non-root tokens.')
 
+    elif action == 'revoke':
+
+        _check_format(obj,'revocation request',REVOCATION_FORMAT)
+
+        capability = obj['IC']
+
     signature = obj.pop('SI')
 
-    _check_signture(obj,signature,sender_key_str)
+    _check_signature(obj,signature,sender_key_str)
 
     device = obj.pop('DE')
 
     return action, obj, device, capability, sender_key_str
 
-def _check_signture(obj,signature,sender_key_str):
+def _check_signature(obj,signature,sender_key_str):
     publicKey = Secp256k1PublicKey.from_hex(sender_key_str)
     token_string = str(cbor.dumps(obj,sort_keys=True)).encode('utf-8')
-    LOGGER.info(token_string)
     if not create_context('secp256k1').verify(signature,token_string,publicKey):
         raise InvalidTransaction('Invalid signature.')
 
@@ -187,9 +192,13 @@ def _set_state_data(device, state, context):
         raise InternalError('State error')
 
 
-def _do_capbac(action, obj, capability, subject, state):
+def _do_capbac(action, obj, capability, sender, state):
     if action == 'issue':
-        return _do_issue(obj, capability, subject, state)
+        return _do_issue(obj, capability, sender, state)
+    elif action == 'revoke':
+        return _do_revoke(obj, capability, sender, state)
+    else:
+        raise InternalError('Unandled action: {}'.format(action))
 
 
 def _do_issue(token, parent, subject, state):
@@ -227,10 +236,14 @@ def _do_issue(token, parent, subject, state):
                 'Cannot issue: no parent capability token with ID = {}'.format(parent))
         parent_token = state[parent]
 
-        # check if expired
+        # check time interval
         if now >= int(parent_token['NA']):
             raise InvalidTransaction(
                 'Cannot issue: parent capability token with ID = {} expired'
+                .format(parent))
+        if now < int(parent_token['NB']):
+            raise InvalidTransaction(
+                'Cannot revoke: capability token with ID = {} still not active'
                 .format(parent))
 
         # check access rights
@@ -251,8 +264,8 @@ def _do_issue(token, parent, subject, state):
                         .format(action,resource, parent))
 
         # next
-        current_token = parent_token;
-        parent = current_token["IC"]
+        current_token = parent_token
+        parent = current_token['IC']
 
     # version is already checked and not required anymore
     token.pop('VR')
@@ -261,6 +274,89 @@ def _do_issue(token, parent, subject, state):
 
     return state
 
+
+def _do_revoke(request, capability, requester, state):
+    identifier = request['ID']
+    msg = 'Revoking capbabiltity token with ID: {}'.format(identifier)
+    LOGGER.debug(msg)
+
+    # check existence of target
+    if identifier not in state:
+        raise InvalidTransaction(
+            'Cannot revoke: target capability token ({}) do not exists'
+            .format(identifier))
+
+    # check authorization
+    if capability not in state:
+        raise InvalidTransaction(
+            'Cannot revoke: no capability token with ID = {}'.format(capability))
+    if state[capability]['SU'] != requester:
+        raise InvalidTransaction('Cannot revoke: requester is not the subject of the sent capability')
+
+    LOGGER.debug('parental check')
+
+    # chek if revoker's token is anchestor of revoked
+    if capability != identifier: # target is its own capability => no need to check
+        current_token = state[identifier]
+        parent = current_token['IC']
+        while parent != None and parent != capability:
+            if parent not in state:
+                raise InternalError('Broken chain')
+            # next
+            current_token = state[parent]
+            parent = current_token['IC']
+        if parent is None:
+            raise InvalidTransaction('Cannot revoke: requester capability has no right over target capability')
+
+    LOGGER.debug('delegation chain check')
+    # delegation chain check
+    now = int(time.time())
+    current_token = state[capability]
+    parent = current_token['IC']
+    while parent != None:
+        if parent not in state:
+            raise InternalError('Broken chain')
+
+        # check time interval
+        if now >= int(current_token['NA']):
+            raise InvalidTransaction(
+                'Cannot revoke: capability token with ID = {} expired'
+                .format(parent))
+        if now < int(current_token['NB']):
+            raise InvalidTransaction(
+                'Cannot revoke: capability token with ID = {} still not active'
+                .format(parent))
+
+        # next
+        current_token = state[parent]
+        parent = current_token['IC']
+
+    LOGGER.debug('revocation')
+    # revocation
+    revocation_type = request['RT']
+    if revocation_type == 'ICO': # Identified Capability Only
+        if state[identifier]['IC'] is None:
+            raise InvalidTransaction(
+                'Cannot revoke: invalid revocation type for root capability')
+        else:
+            for token in state: # assign childs to grampa
+                if state[token]['IC'] == identifier:
+                    state[token]['IC'] = state[identifier]['IC']
+    else:
+        LOGGER.debug('recursive removal')
+        state =_recursively_remove_childs(state, identifier)
+
+    if revocation_type != 'DCO': # Dependant Capability Only
+        state.pop(identifier)
+
+    return state
+
+def _recursively_remove_childs(state, parent):
+    for token in set(state):
+        if state[token]['IC'] == parent:
+            state = _recursively_remove_childs(state, token)
+            state.pop(token)
+    return state
 
 def parse_args(args):
     parser = argparse.ArgumentParser(

@@ -89,8 +89,9 @@ def create_parser(prog_name):
 
     add_issue_parser(subparsers, parent_parser)
     add_list_parser(subparsers,parent_parser)
-    #add_revoke_parser(subparsers,parent_parser)
-    #add_validate_parser(subparsers,parent_parser)
+    add_revoke_parser(subparsers,parent_parser)
+    add_validate_parser(subparsers,parent_parser)
+    add_submit_parser(subparsers,parent_parser)
 
     return parser
 
@@ -206,12 +207,39 @@ def add_validate_parser(subparsers, parent_parser):
         type=str,
         help="identify file containing user's private key")
 
-
 def do_validate(args):
     client = _get_client(args)
     response = client.validate(args.request)
-    print("Response: {}".format(response))
+    print("Authorized: {}".format(response))
 
+def add_submit_parser(subparsers, parent_parser):
+    message = 'Return a signed access request.'
+
+    parser = subparsers.add_parser(
+        'submit',
+        parents=[parent_parser],
+        description=message,
+        help='create a signed request')
+
+    parser.add_argument(
+        'request',
+        type=str,
+        help='access request')
+
+    parser.add_argument(
+        '--url',
+        type=str,
+        help='specify URL of REST API')
+
+    parser.add_argument(
+        '--keyfile',
+        type=str,
+        help="identify file containing user's private key")
+
+def do_submit(args):
+    client = _get_client(args)
+    response = client.submit(args.request)
+    print(response)
 
 def _get_client(args):
     return CapBACClient(
@@ -253,6 +281,7 @@ def main(prog_name=os.path.basename(sys.argv[0]), args=None):
     elif args.command == 'revoke':   do_revoke(args)
     elif args.command == 'validate': do_validate(args)
     elif args.command == 'list':     do_list(args)
+    elif args.command == 'submit':   do_submit(args)
     else:
         raise CapBACCliException("Invalid command: {}".format(args.command))
 
