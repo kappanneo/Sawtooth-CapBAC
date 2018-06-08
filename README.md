@@ -279,15 +279,16 @@ capbac submit --keyfile /root/.sawtooth/keys/subject.priv '{"DE":"coap://light.b
 ```
 
 Output: (prettified)
-{
-    "VR": "1.0",
-    "DE": "coap://light.b1.unipg.it",
-    "IC": "0123456789abcde1",
-    "II": "1528492264",
-    "SI": "0bd47d10f76926f597196b1ba326c597c34504c9936eeee763cf902f90e5d3640c10531aa0e32c48c7711f3d018a27f5b980f0276a5842fcbbf38a0d5f704c2d",
-    "RE": "light",
-    "AC": "GET"
-}
+
+    {
+        "VR": "1.0",
+        "DE": "coap://light.b1.unipg.it",
+        "IC": "0123456789abcde1",
+        "II": "1528492264",
+        "SI": "0bd47d10f76926f597196b1ba326c597c34504c9936eeee763cf902f90e5d3640c10531aa0e32c48c7711f3d018a27f5b980f0276a5842fcbbf38a0d5f704c2d",
+        "RE": "light",
+        "AC": "GET"
+    }
 
 ### capbac validate
 
