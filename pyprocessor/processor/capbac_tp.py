@@ -213,12 +213,7 @@ def _do_issue(token, parent, subject, state):
 
     now = int(time.time())
     LOGGER.debug('reformat access rights')
-    # reformat access rights
-    new_format = {}
-    for access_right in token['AR']:
-        new_format[access_right['RE']] = {access_right["AC"]:access_right["DD"]}
-    token['AR'] = new_format
-    LOGGER.debug('check authorization')
+
     # check authorization
     if parent != None:
         if parent not in state:
@@ -226,6 +221,13 @@ def _do_issue(token, parent, subject, state):
                 'Cannot issue: no parent capability token with ID = {}'.format(parent))
         if state[parent]['SU'] != subject:
             raise InvalidTransaction('Cannot issue: issuer is not the subject of parent capability')
+
+    # reformat access rights
+    new_format = {}
+    for access_right in token['AR']:
+        new_format[access_right['RE']] = {access_right["AC"]:access_right["DD"]}
+    token['AR'] = new_format
+    LOGGER.debug('check authorization')
 
     LOGGER.debug('delegation chain check')
     # delegation chain check
