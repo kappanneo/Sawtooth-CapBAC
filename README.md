@@ -198,13 +198,13 @@ Example of root token to be issued: (subject, issuer capability, signature, vers
             "DD": 3
         }],
         "NB": "1525691114",
-        "NA": "1530691114"
+        "NA": "1540691114"
     }
 
 Corresponding command:
 
 ```bash
-capbac issue --root '{"ID":"0123456789abcdef","IS":"claudio@unipg.it","DE":"coap://light.b1.unipg.it","AR":[{"AC":"GET","RE":"light","DD":4},{"AC":"PUT","RE":"off","DD":3}],"NB":"1525691114","NA":"1530691114"}'
+capbac issue --root '{"ID":"0123456789abcdef","IS":"claudio@unipg.it","DE":"coap://light.b1.unipg.it","AR":[{"AC":"GET","RE":"light","DD":4},{"AC":"PUT","RE":"off","DD":3}],"NB":"1525691114","NA":"1540691114"}'
 ```
 
 For testing purposes we can create a new sawtooth identitied with:
@@ -245,14 +245,14 @@ Example of capability dependant on the previous one: (signature, version and tim
             "DD": 0
         }],
         "NB": "1525691114",
-        "NA": "1530691114",
+        "NA": "1540691114",
         "IC": "0123456789abcdef"
     }
 
 Corresponding command:
 
 ```bash
-capbac issue '{"ID":"0123456789abcde1","IS":"claudio@unipg.it","SU":"02b6b9f80ee44f5d711592def2a42941c66f461a9dbb5bf5d164c6d8b35ced8aea","DE":"coap://light.b1.unipg.it","AR":[{"AC":"GET","RE":"light","DD":0}],"NB":"1525691114","NA":"1530691114","IC":"0123456789abcdef"}'
+capbac issue '{"ID":"0123456789abcde1","IS":"claudio@unipg.it","SU":"02b6b9f80ee44f5d711592def2a42941c66f461a9dbb5bf5d164c6d8b35ced8aea","DE":"coap://light.b1.unipg.it","AR":[{"AC":"GET","RE":"light","DD":0}],"NB":"1525691114","NA":"1540691114","IC":"0123456789abcdef"}'
 ```
 
 Now "subject" should be able to access "light"
