@@ -20,7 +20,7 @@ services:
     container_name: capbac-processor
     build:
       context: .
-      dockerfile: ./pyprocessor/Dockerfile
+      dockerfile: ./capbac-processor/Dockerfile
       args:
         - http_proxy
         - https_proxy
@@ -34,7 +34,7 @@ services:
     container_name: capbac-client
     build:
       context: .
-      dockerfile: ./pyclient/Dockerfile
+      dockerfile: ./capbac-client/Dockerfile
       args:
         - http_proxy
         - https_proxy
