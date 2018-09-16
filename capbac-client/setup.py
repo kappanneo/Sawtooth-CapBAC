@@ -23,7 +23,7 @@ from setuptools import setup, find_packages
 data_files = []
 
 setup(
-    name='capbac-cli',
+    name='capbac',
     version='1.0',
     description='Sawtooth CapBAC',
     author='kappanneo',
