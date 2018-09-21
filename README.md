@@ -2,159 +2,6 @@
 
 Sawtooth transaction family for Capability Based Access Control.
 
-## version format
-
-    FAMILY_NAME = 'capbac'
-    FAMILY_VERSION = '1.0'
-    IDENTIFIER_LENGTH = 16
-    TIMESTAMP_LENGTH = 10
-    MAX_URI_LENGTH = 2000
-    PUBLICKEY_LENGTH = 66
-    SIGNATURE_LENGTH = 128
-
-    REQUEST_ACTIONS = {'GET','POST','PUT','DELETE'}
-
-    PAYLOAD_FORMAT = {
-        'AC': {
-            'description': 'action',
-            'allowed values': {'issue','revoke'}
-        },
-        'OB': {
-            'description': 'action\'s object',
-            'allowed types': {type({})}
-        }
-    }
-
-    TOKEN_FORMAT = {
-        'ID': {
-            'description': 'token identifier',
-            'len': IDENTIFIER_LENGTH
-        },
-        'II': {
-            'description': 'issue istant',
-            'len': TIMESTAMP_LENGTH
-        },
-        'VR':{
-            'description': 'version',
-            'allowed values': {FAMILY_VERSION}
-        },
-        'IS': {
-            'description': 'issuer\'s URI',
-            'max_len': MAX_URI_LENGTH
-        },
-        'SU': {
-            'description': 'subject\'s public key',
-            'len': PUBLICKEY_LENGTH
-        },
-        'DE': {
-            'description': 'device\'s URI',
-            'max_len': MAX_URI_LENGTH
-        },
-        'AR': {
-            'description': 'access rights',
-            'allowed types': {list},
-        },
-        'NB': {
-            'description': 'not before time',
-            'len': TIMESTAMP_LENGTH
-        },
-        'NA': {
-            'description': 'not after time',
-            'len': TIMESTAMP_LENGTH
-        },
-        'IC': {
-            'description': 'issuer capability (parent token identifier)',
-            'allowed types': {type(None), str},
-            'len': IDENTIFIER_LENGTH
-        },
-        'SI': {
-            'description': 'issuer\'s signature',
-            'len': SIGNATURE_LENGTH
-        }
-    }
-
-    ACCESS_RIGHT_FORMAT = {
-        'AC': {
-            'description': 'permitted action',
-            'allowed values': REQUEST_ACTIONS,
-        },
-        'RE': {
-            'description': 'resource',
-            'max_len': MAX_URI_LENGTH
-        },
-        'DD': {
-            'description': 'delegation depth',
-            'allowed types': {int}
-        }
-    }
-
-    REVOCATION_FORMAT = {
-        'ID': {
-            'description': 'identifier of the revoked token',
-            'len': IDENTIFIER_LENGTH
-        },
-        'II': {
-            'description': 'issue istant',
-            'len': TIMESTAMP_LENGTH
-        },
-        'VR':{
-            'description': 'version',
-            'allowed values': {FAMILY_VERSION}
-        },
-        'IS': {
-            'description': 'issuer\'s URI',
-            'max_len': MAX_URI_LENGTH
-        },
-        'DE': {
-            'description': 'device\'s URI',
-            'max_len': MAX_URI_LENGTH
-        },
-        'RT': {
-            'description': 'revocation type',
-            'allowed values': {'ICO','ALL','DCO'}
-        },
-        'IC': {
-            'description': 'issuer capability',
-            'allowed types': {type(None), str},
-            'len': IDENTIFIER_LENGTH
-        },
-        'SI': {
-            'description': 'issuer\'s signature',
-            'len': SIGNATURE_LENGTH
-        }
-    }
-
-    VALIDATION_FORMAT = {
-        'II': {
-            'description': 'issue istant',
-            'len': TIMESTAMP_LENGTH
-        },
-        'VR':{
-            'description': 'version',
-            'allowed values': {FAMILY_VERSION}
-        },
-        'DE': {
-            'description': 'device\'s URI',
-            'max_len': MAX_URI_LENGTH
-        },
-        'AC': {
-            'description': 'requested action',
-            'allowed values': REQUEST_ACTIONS,
-        },
-        'RE': {
-            'description': 'resource',
-            'max_len': MAX_URI_LENGTH
-        },
-        'IC': {
-            'description': 'requester\'s capability',
-            'len': IDENTIFIER_LENGTH
-        },
-        'SI': {
-            'description': 'requester\'s signature',
-            'len': SIGNATURE_LENGTH
-        }
-    }
-
 ## build
 
 ```bash
@@ -182,6 +29,8 @@ sawtooth keygen # create RSA key pair for authentication
 capbac issue [--root] <token as JSON>
 ```
 
+*For more datails on the token structure see [capbac_version.py](https://gitlab.com/kappanneo/sawtooth-capbac/blob/master/capbac-client/cli/capbac_version.py)
+
 Example of root token to be issued: (subject, issuer capability, signature, version and timestamp are added by the client)
 
     {
@@ -207,7 +56,7 @@ Corresponding command:
 capbac issue --root '{"ID":"0123456789abcdef","IS":"claudio@unipg.it","DE":"coap://light.b1.unipg.it","AR":[{"AC":"GET","RE":"light","DD":4},{"AC":"PUT","RE":"off","DD":3}],"NB":"1525691114","NA":"1540691114"}'
 ```
 
-For testing purposes we can create a new sawtooth identitied with:
+For testing purposes we can create a new sawtooth identity with:
 
 ```bash
 sawtooth keygen <name>

@@ -1,40 +1,15 @@
-# Copyright 2018 Intel Corporation
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-# ------------------------------------------------------------------------------
-
-version: '2.1'
+version: '3.7'
 
 services:
-  capbac-tp:
-    container_name: capbac-tp
+  Subject:
+    container_name: subject
     build:
-      context: .
-      dockerfile: ./capbac-processor/Dockerfile
-      args:
-        - http_proxy
-        - https_proxy
-        - no_proxy
-    depends_on:
-      - validator
-    volumes:
-      - '.:/project/capbac/'
+      context: ./Subject
 
-  capbac-client:
-    container_name: capbac-cli
+  Device:
+    container_name: device
     build:
-      context: .
-      dockerfile: ./capbac-client/Dockerfile
+      context: ./Device
       args:
         - http_proxy
         - https_proxy
@@ -43,14 +18,23 @@ services:
       - 'http_proxy=${http_proxy}'
       - 'https_proxy=${https_proxy}'
       - 'no_proxy=rest-api,validator,${no_proxy}'
-    volumes:
-      - '.:/project/capbac/'
     ports:
       - '0.0.0.0:3000:3000'
     depends_on:
       - sawtooth-rest-api
     entrypoint: "bash -c \"sawtooth keygen --force sawtooth && tail -f /dev/null\""
     stop_signal: SIGKILL
+
+  capbac-processor:
+    container_name: capbac-tp
+    build:
+      context: ./PDP/capbac-processor/Dockerfile
+      args:
+        - http_proxy
+        - https_proxy
+        - no_proxy
+    depends_on:
+      - validator
 
   sawtooth-rest-api:
     container_name: rest-api
@@ -65,12 +49,6 @@ services:
       sawtooth-rest-api -vvv
         --connect tcp://validator:4004
         --bind sawtooth-rest-api:8008
-
-  settings-tp:
-    image: hyperledger/sawtooth-settings-tp:1.0
-    depends_on:
-      - validator
-    command: settings-tp -vv --connect tcp://validator:4004
 
   validator:
     container_name: validator
