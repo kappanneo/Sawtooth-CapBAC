@@ -1,72 +1,74 @@
 version: '3.7'
 
 services:
-  Subject:
+  subject:
     container_name: subject
     build:
       context: ./Subject
+    stdin_open: true
+    tty: true
 
-  Device:
+  device:
     container_name: device
     build:
       context: ./Device
-      args:
-        - http_proxy
-        - https_proxy
-        - no_proxy
-    environment:
-      - 'http_proxy=${http_proxy}'
-      - 'https_proxy=${https_proxy}'
-      - 'no_proxy=rest-api,validator,${no_proxy}'
-    ports:
-      - '0.0.0.0:3000:3000'
-    depends_on:
-      - sawtooth-rest-api
-    entrypoint: "bash -c \"sawtooth keygen --force sawtooth && tail -f /dev/null\""
-    stop_signal: SIGKILL
+  #     args:
+  #       - http_proxy
+  #       - https_proxy
+  #       - no_proxy
+  #   environment:
+  #     - 'http_proxy=${http_proxy}'
+  #     - 'https_proxy=${https_proxy}'
+  #     - 'no_proxy=rest-api,validator,${no_proxy}'
+  #   ports:
+  #     - '0.0.0.0:3000:3000'
+  #   depends_on:
+  #     - sawtooth-rest-api
+  #   entrypoint: "bash -c \"sawtooth keygen --force sawtooth && tail -f /dev/null\""
+  #   stop_signal: SIGKILL
 
-  capbac-processor:
-    container_name: capbac-tp
-    build:
-      context: ./PDP/capbac-processor/Dockerfile
-      args:
-        - http_proxy
-        - https_proxy
-        - no_proxy
-    depends_on:
-      - validator
+  # capbac-processor:
+  #   container_name: capbac-tp
+  #   build:
+  #     context: ./PDP/capbac-processor/Dockerfile
+  #     args:
+  #       - http_proxy
+  #       - https_proxy
+  #       - no_proxy
+  #   depends_on:
+  #     - validator
 
-  sawtooth-rest-api:
-    container_name: rest-api
-    image: hyperledger/sawtooth-rest-api:1.0
-    expose:
-      - 8008
-    ports:
-      - '8008:8008'
-    depends_on:
-      - validator
-    entrypoint: |
-      sawtooth-rest-api -vvv
-        --connect tcp://validator:4004
-        --bind sawtooth-rest-api:8008
+  # sawtooth-rest-api:
+  #   container_name: rest-api
+  #   image: hyperledger/sawtooth-rest-api:1.0
+  #   expose:
+  #     - 8008
+  #   ports:
+  #     - '8008:8008'
+  #   depends_on:
+  #     - validator
+  #   entrypoint: |
+  #     sawtooth-rest-api -vvv
+  #       --connect tcp://validator:4004
+  #       --bind sawtooth-rest-api:8008
 
-  validator:
-    container_name: validator
-    image: hyperledger/sawtooth-validator:1.0
-    expose:
-      - 4004
-    ports:
-      - '4040:4004'
-    command: |
-      bash -c "
-        if [ ! -f /etc/sawtooth/keys/validator.priv ]; then
-        sawadm keygen &&
-        sawtooth keygen my_key &&
-        sawset genesis -k /root/.sawtooth/keys/my_key.priv &&
-        sawadm genesis config-genesis.batch
-        fi;
-        sawtooth-validator -vvv \
-          --endpoint tcp://validator:8800 \
-          --bind component:tcp://eth0:4004 \
-          --bind network:tcp://eth0:8800
-      "
+  # validator:
+  #   container_name: validator
+  #   image: hyperledger/sawtooth-validator:1.0
+  #   expose:
+  #     - 4004
+  #   ports:
+  #     - '4040:4004'
+  #   command: |
+  #     bash -c "
+  #       if [ ! -f /etc/sawtooth/keys/validator.priv ]; then
+  #       sawadm keygen &&
+  #       sawtooth keygen my_key &&
+  #       sawset genesis -k /root/.sawtooth/keys/my_key.priv &&
+  #       sawadm genesis config-genesis.batch
+  #       fi;
+  #       sawtooth-validator -vvv \
+  #         --endpoint tcp://validator:8800 \
+  #         --bind component:tcp://eth0:4004 \
+  #         --bind network:tcp://eth0:8800
+  #     "

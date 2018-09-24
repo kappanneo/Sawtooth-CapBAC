@@ -6,4 +6,4 @@ COPY . .
 
 EXPOSE 5683 
 
-CMD ["python3","server.py"]
+CMD ["python3","coap-server.py"]
