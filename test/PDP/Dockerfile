@@ -31,8 +31,12 @@ RUN apt-get install -y -q \
 
 EXPOSE 4004/tcp
 
-WORKDIR /project/capbac/capbac-processor
+WORKDIR /home/capbac
 
-ENV PATH "$PATH:/project/capbac/capbac-processor"
+COPY . .
+
+WORKDIR /home/capbac/capbac-processor
+
+ENV PATH "$PATH:/home/capbac/capbac-processor"
 
 CMD bash -c './capbac-tp'
