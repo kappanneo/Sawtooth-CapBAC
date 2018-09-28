@@ -1,4 +1,4 @@
-# Copyright 2018 Intel Corporation
+# Copyright 2016 Intel Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,26 +13,10 @@
 # limitations under the License.
 # -----------------------------------------------------------------------------
 
-FROM ubuntu:xenial
+__all__ = [
+    'capbac_cli',
+    'capbac_client',
+    'capbac_exceptions',
+    'capbac_version'
+]
 
-RUN \
- apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 8AA7AF1F1091A5FD \
- && echo "deb http://repo.sawtooth.me/ubuntu/1.0/stable xenial universe" >> /etc/apt/sources.list \
- && apt-get update
-
-RUN apt-get install -y -q \
-    apt-transport-https \
-    build-essential \
-    ca-certificates \
-    python3-sawtooth-sdk \
-    python3-cbor \
- && apt-get clean \
- && rm -rf /var/lib/apt/lists/*
-
-EXPOSE 4004/tcp
-
-WORKDIR /project/capbac/capbac-processor
-
-ENV PATH "$PATH:/project/capbac/capbac-processor"
-
-CMD bash -c './capbac-tp'

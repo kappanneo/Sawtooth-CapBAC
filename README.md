@@ -2,6 +2,8 @@
 
 Sawtooth transaction family for Capability Based Access Control.
 
+# OUTDATED README
+
 ## build
 
 ```bash

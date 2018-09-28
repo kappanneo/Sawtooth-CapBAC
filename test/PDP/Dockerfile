@@ -15,6 +15,10 @@
 
 FROM ubuntu:xenial
 
+WORKDIR /home/capbac
+
+COPY . .
+
 RUN \
  apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 8AA7AF1F1091A5FD \
  && echo "deb http://repo.sawtooth.me/ubuntu/1.0/stable xenial universe" >> /etc/apt/sources.list \
@@ -31,12 +35,6 @@ RUN apt-get install -y -q \
 
 EXPOSE 4004/tcp
 
-WORKDIR /home/capbac
-
-COPY . .
-
-WORKDIR /home/capbac/capbac-processor
-
 ENV PATH "$PATH:/home/capbac/capbac-processor"
 
-CMD bash -c './capbac-tp'
+CMD bash -c './capbac-processor/capbac-tp'
