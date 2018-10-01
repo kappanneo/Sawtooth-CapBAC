@@ -39,7 +39,7 @@ RUN echo "deb http://repo.sawtooth.me/ubuntu/ci xenial universe" >> /etc/apt/sou
     libffi-dev \
     libssl-dev \
     python3-aiodns=1.1.1-1 \
-    python3-aiohttp>=2.3.2-1 \
+    python3-aiohttp=2.3.2-1 \
     python3-aiopg \
     python3-async-timeout=1.2.0-1 \
     python3-bitcoin=1.1.42-1 \
@@ -76,6 +76,7 @@ RUN echo "deb http://repo.sawtooth.me/ubuntu/ci xenial universe" >> /etc/apt/sou
     software-properties-common \
     python3-sawtooth-sdk \
     python3-sawtooth-cli \
+    curl \
  && apt-get clean \
  && rm -rf /var/lib/apt/lists/* \
  && unset PYTHONPATH \

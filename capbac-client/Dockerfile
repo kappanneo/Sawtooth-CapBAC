@@ -17,14 +17,6 @@ FROM ubuntu:xenial
 
 ARG DEBIAN_FRONTEND=noninteractive
 
-WORKDIR /home/capbac
-
-COPY ./capbac-client ./capbac-client
-
-EXPOSE 3000
-
-ENV PATH "$PATH:/home/capbac/capbac-client"
-
 RUN echo "deb http://repo.sawtooth.me/ubuntu/ci xenial universe" >> /etc/apt/sources.list \
  && apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 8AA7AF1F1091A5FD \
  && echo "deb http://repo.sawtooth.me/ubuntu/1.0/stable xenial universe" >> /etc/apt/sources.list \
@@ -76,17 +68,13 @@ RUN echo "deb http://repo.sawtooth.me/ubuntu/ci xenial universe" >> /etc/apt/sou
     software-properties-common \
     python3-sawtooth-sdk \
     python3-sawtooth-cli \
-    curl \
  && apt-get clean \
- && rm -rf /var/lib/apt/lists/* \
- && unset PYTHONPATH \
- && python3 /home/capbac/capbac-client/setup.py clean --all \
- && python3 /home/capbac/capbac-client/setup.py build
+ && rm -rf /var/lib/apt/lists/*
 
-EXPOSE 5683
+WORKDIR /project/capbac/capbac-client
 
-RUN pip3 install aiocoap
+ENV PATH "$PATH:/project/capbac/capbac-client"
 
-COPY . .
+EXPOSE 3000
 
-CMD python3 coap-server.py
+CMD unset PYTHONPATH && python3 setup.py clean --all && python3 setup.py build
