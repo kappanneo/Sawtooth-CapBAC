@@ -21,8 +21,6 @@ WORKDIR /home/capbac
 
 COPY ./capbac-client ./capbac-client
 
-EXPOSE 3000
-
 ENV PATH "$PATH:/home/capbac/capbac-client"
 
 RUN echo "deb http://repo.sawtooth.me/ubuntu/ci xenial universe" >> /etc/apt/sources.list \

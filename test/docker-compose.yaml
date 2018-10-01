@@ -20,19 +20,9 @@ services:
   device:
     container_name: device
     build:
-      context: ./Device    
-      args:
-        - http_proxy
-        - https_proxy
-        - no_proxy
-    environment:
-      - 'http_proxy=${http_proxy}'
-      - 'https_proxy=${https_proxy}'
-      - 'no_proxy=rest-api,validator,${no_proxy}'
+      context: ./Device
     expose:
-      - 5683  
-    ports:
-      - '0.0.0.0:3000:3000'
+      - 5683
     depends_on:
       - sawtooth-rest-api
     entrypoint: bash -c "sawtooth keygen --force sawtooth && sawtooth keygen --force && tail -f /dev/null"
@@ -49,9 +39,7 @@ services:
     container_name: rest-api
     image: hyperledger/sawtooth-rest-api:1.0
     expose:
-      - 8008    
-    ports:
-      - '8008:8008'
+      - 8008
     depends_on:
       - validator
     entrypoint: |
@@ -69,9 +57,7 @@ services:
     container_name: validator
     image: hyperledger/sawtooth-validator:1.0
     expose:
-      - 4004    
-    ports:
-      - '4040:4004'
+      - 4004
     command: |
       bash -c "
         if [ ! -f /etc/sawtooth/keys/validator.priv ]; then
