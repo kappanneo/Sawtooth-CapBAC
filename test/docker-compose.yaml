@@ -3,35 +3,27 @@ version: '3.7'
 services:
   subject:
     container_name: subject
+    build: ./Subject
     depends_on:
       -  device
-    build:
-      context: ./Subject
 
   issuer:
     container_name: issuer
-    build:
-      context: ./Issuer
+    build: ./Issuer
     depends_on:
       - sawtooth-rest-api
-    entrypoint: bash -c "sawtooth keygen --force sawtooth && sawtooth keygen --force && tail -f /dev/null"
-    stop_signal: SIGKILL
 
   device:
     container_name: device
-    build:
-      context: ./Device
+    build: ./Device
     expose:
       - 5683
     depends_on:
       - sawtooth-rest-api
-    entrypoint: bash -c "sawtooth keygen --force sawtooth && sawtooth keygen --force && tail -f /dev/null"
-    stop_signal: SIGKILL
 
   capbac-processor:
     container_name: capbac-tp
-    build:
-      context: ./PDP
+    build: ./PDP
     depends_on:
       - validator
 
