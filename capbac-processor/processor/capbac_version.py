@@ -47,10 +47,6 @@ TOKEN_FORMAT = {
         'description': 'version',
         'allowed values': {FAMILY_VERSION}
     },
-    'IS': {
-        'description': 'issuer\'s URI',
-        'max_len': MAX_URI_LENGTH
-    },
     'SU': {
         'description': 'subject\'s public key',
         'len': PUBLICKEY_LENGTH
@@ -109,10 +105,6 @@ REVOCATION_FORMAT = {
     'VR':{
         'description': 'version',
         'allowed values': {FAMILY_VERSION}
-    },
-    'IS': {
-        'description': 'issuer\'s URI',
-        'max_len': MAX_URI_LENGTH
     },
     'DE': {
         'description': 'device\'s URI',
