@@ -20,7 +20,7 @@ services:
     container_name: subject
     build: ./Subject
     depends_on:
-      -  device
+      - device
 
   issuer:
     container_name: issuer
@@ -55,6 +55,7 @@ services:
         --bind sawtooth-rest-api:8008
 
   settings-tp:
+    container_name: settings-tp
     image: hyperledger/sawtooth-settings-tp:1.0
     depends_on:
       - validator
