@@ -213,7 +213,7 @@ def _do_issue(token, parent, subject, state):
 
     now = int(time.time())
 
-    LOGGER.debug('check authorization')
+    LOGGER.debug('Checking authorization')
     # check authorization
     if parent != None:
         if parent not in state:
@@ -222,14 +222,14 @@ def _do_issue(token, parent, subject, state):
         if state[parent]['SU'] != subject:
             raise InvalidTransaction('Cannot issue: issuer is not the subject of parent capability')
 
-    LOGGER.debug('reformat access rights')
+    LOGGER.debug('Reformatting access rights')
     # reformat access rights
     new_format = {}
     for access_right in token['AR']:
         new_format.setdefault(access_right['RE'],[]).append({access_right["AC"]:access_right["DD"]}) 
     token['AR'] = new_format
 
-    LOGGER.debug('delegation chain check')
+    LOGGER.debug('Checking delegation chain')
     # delegation chain check
     current_token = token
     while parent != None:
@@ -295,8 +295,7 @@ def _do_revoke(request, capability, requester, state):
     if state[capability]['SU'] != requester:
         raise InvalidTransaction('Cannot revoke: requester is not the subject of the sent capability')
 
-    LOGGER.debug('parental check')
-
+    LOGGER.debug('Checking delegation chain')
     # chek if revoker's token is anchestor of revoked
     if capability != identifier: # target is its own capability => no need to check
         current_token = state[identifier]
@@ -310,7 +309,6 @@ def _do_revoke(request, capability, requester, state):
         if parent is None:
             raise InvalidTransaction('Cannot revoke: requester capability has no right over target capability')
 
-    LOGGER.debug('delegation chain check')
     # delegation chain check
     now = int(time.time())
     current_token = state[capability]
@@ -333,7 +331,7 @@ def _do_revoke(request, capability, requester, state):
         current_token = state[parent]
         parent = current_token['IC']
 
-    LOGGER.debug('revocation')
+    LOGGER.debug('Removing token')
     # revocation
     revocation_type = request['RT']
     if revocation_type == 'ICO': # Identified Capability Only
@@ -345,11 +343,12 @@ def _do_revoke(request, capability, requester, state):
                 if state[token]['IC'] == identifier:
                     state[token]['IC'] = state[identifier]['IC']
     else:
-        LOGGER.debug('recursive removal')
         state =_recursively_remove_childs(state, identifier)
 
     if revocation_type != 'DCO': # Dependant Capability Only
         state.pop(identifier)
+
+    LOGGER.info('Token removed.')
 
     return state
 
