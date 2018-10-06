@@ -79,8 +79,6 @@ RUN echo "deb http://repo.sawtooth.me/ubuntu/ci xenial universe" >> /etc/apt/sou
  && rm -rf /var/lib/apt/lists/* \
  && unset PYTHONPATH \
  && python3 /home/capbac/capbac-client/setup.py clean --all \
- && python3 /home/capbac/capbac-client/setup.py build \
- && sawtooth keygen --force sawtooth \
- && sawtooth keygen --force
+ && python3 /home/capbac/capbac-client/setup.py build
 
-CMD ["sleep","infinity"]
+CMD sawtooth keygen sawtooth; sawtooth keygen; sleep infinity

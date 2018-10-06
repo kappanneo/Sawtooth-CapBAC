@@ -226,7 +226,8 @@ def _do_issue(token, parent, subject, state):
     # reformat access rights
     new_format = {}
     for access_right in token['AR']:
-        new_format.setdefault(access_right['RE'],[]).append({access_right["AC"]:access_right["DD"]}) 
+        new_format.setdefault(access_right['RE'],{})
+        new_format[access_right['RE']].update({access_right['AC']:access_right['DD']})
     token['AR'] = new_format
 
     LOGGER.debug('Checking delegation chain')
@@ -245,7 +246,7 @@ def _do_issue(token, parent, subject, state):
                 .format(parent))
         if now < int(parent_token['NB']):
             raise InvalidTransaction(
-                'Cannot revoke: capability token with ID = {} still not active'
+                'Cannot issue: capability token with ID = {} still not active'
                 .format(parent))
 
         # check access rights

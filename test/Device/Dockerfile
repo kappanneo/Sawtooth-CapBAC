@@ -79,9 +79,7 @@ RUN echo "deb http://repo.sawtooth.me/ubuntu/ci xenial universe" >> /etc/apt/sou
  && rm -rf /var/lib/apt/lists/* \
  && unset PYTHONPATH \
  && python3 /home/capbac/capbac-client/setup.py clean --all \
- && python3 /home/capbac/capbac-client/setup.py build \
- && sawtooth keygen --force sawtooth \
- && sawtooth keygen --force
+ && python3 /home/capbac/capbac-client/setup.py build 
 
 EXPOSE 5683
 
@@ -89,4 +87,4 @@ RUN pip3 install aiocoap
 
 COPY . .
 
-CMD ["python3", "coap-server.py"]
+CMD sawtooth keygen sawtooth; sawtooth keygen; python3 coap-server.py
