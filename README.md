@@ -32,7 +32,7 @@ Example of root token to be issued: (subject,issuer capability, signature, versi
         "DE": "coap://device",
         "AR": [{
             "AC": "GET",
-            "RE": "light",
+            "RE": "time",
             "DD": 5
         }, {
             "AC": "GET",
@@ -50,7 +50,7 @@ Example of root token to be issued: (subject,issuer capability, signature, versi
 Corresponding command:
 
 ```bash
-capbac issue --root '{"ID":"0123456789abcdef","DE":"coap://device","AR":[{"AC":"GET","RE":"light","DD":5},{"AC":"GET","RE":"resource","DD":1},{"AC":"PUT","RE":"resource","DD":0}],"NB":"1525691114","NA":"1540691114"}'
+capbac issue --root '{"ID":"0123456789abcdef","DE":"coap://device","AR":[{"AC":"GET","RE":"time","DD":5},{"AC":"GET","RE":"resource","DD":1},{"AC":"PUT","RE":"resource","DD":0}],"NB":"1525691114","NA":"1540691114"}'
 ```
 
 Expected output:
@@ -111,7 +111,7 @@ Example of capability dependant on the previous one: (signature, version and tim
         "DE": "coap://device",
         "AR": [{
             "AC": "GET",
-            "RE": "light",
+            "RE": "time",
             "DD": 0
         }],
         "NB": "1525691114",
@@ -122,10 +122,10 @@ Example of capability dependant on the previous one: (signature, version and tim
 Corresponding command:
 
 ```bash
-capbac issue '{"ID":"0123456789abcde1","SU":"02b6b9f80ee44f5d711592def2a42941c66f461a9dbb5bf5d164c6d8b35ced8aea","DE":"coap://device","AR":[{"AC":"GET","RE":"light","DD":0}],"NB":"1525691114","NA":"1540691114","IC":"0123456789abcdef"}'
+capbac issue '{"ID":"0123456789abcde1","SU":"02b6b9f80ee44f5d711592def2a42941c66f461a9dbb5bf5d164c6d8b35ced8aea","DE":"coap://device","AR":[{"AC":"GET","RE":"time","DD":0}],"NB":"1525691114","NA":"1540691114","IC":"0123456789abcdef"}'
 ```
 
-Now "subject" should be able to access "light" -->
+Now "subject" should be able to access "time" -->
 
 <!-- ### capbac submit
 
@@ -138,14 +138,14 @@ Example of access request: (signature, version and timestamp are added by the cl
     {
         "DE": "coap://device",
         "AC": "GET",
-        "RE": "light",
+        "RE": "time",
         "IC": "0123456789abcde1"
     }
 
 Corresponding command:
 
 ```bash
-capbac submit --keyfile /root/.sawtooth/keys/subject.priv '{"DE":"coap://device","AC":"GET","RE":"light","IC":"0123456789abcde1"}'
+capbac submit --keyfile /root/.sawtooth/keys/subject.priv '{"DE":"coap://device","AC":"GET","RE":"time","IC":"0123456789abcde1"}'
 ```
 
 Output: (prettified)
@@ -156,7 +156,7 @@ Output: (prettified)
         "IC": "0123456789abcde1",
         "II": "1528492264",
         "SI": "0bd47d10f76926f597196b1ba326c597c34504c9936eeee763cf902f90e5d3640c10531aa0e32c48c7711f3d018a27f5b980f0276a5842fcbbf38a0d5f704c2d",
-        "RE": "light",
+        "RE": "time",
         "AC": "GET"
     } -->
 
@@ -169,7 +169,7 @@ capbac validate <access request as JSON>
 Command corresponding to the output from previous example:
 
 ```bash
-capbac validate '{"VR":"1.0","DE":"coap://device","IC":"0123456789abcdef","II":"1528492264","SI":"0bd47d10f76926f597196b1ba326c597c34504c9936eeee763cf902f90e5d3640c10531aa0e32c48c7711f3d018a27f5b980f0276a5842fcbbf38a0d5f704c2d","RE":"light","AC":"GET"}'
+capbac validate '{"VR":"1.0","DE":"coap://device","IC":"0123456789abcdef","II":"1528492264","SI":"0bd47d10f76926f597196b1ba326c597c34504c9936eeee763cf902f90e5d3640c10531aa0e32c48c7711f3d018a27f5b980f0276a5842fcbbf38a0d5f704c2d","RE":"time","AC":"GET"}'
 ```
  -->
 ### capbac list
@@ -189,7 +189,7 @@ Expected output:
     {
         "0123456789abcdef": {
             "AR": {
-                "light": [
+                "time": [
                     {
                         "GET": 5
                     }
