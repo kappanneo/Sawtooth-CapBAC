@@ -19,8 +19,6 @@ services:
   subject:
     container_name: subject
     build: ./Subject
-    depends_on:
-      - device
 
   issuer:
     container_name: issuer
