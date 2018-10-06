@@ -184,6 +184,33 @@ Following previous example:
 capbac list coap://device
 ```
 
+Expected output:
+
+    {
+        "0123456789abcdef": {
+            "AR": {
+                "light": [
+                    {
+                        "GET": 5
+                    }
+                ],
+                "resource": [
+                    {
+                        "GET": 1
+                    },
+                    {
+                        "PUT": 0
+                    }
+                ]
+            },
+            "IC": null,
+            "II": "1538842506",
+            "NA": "1540691114",
+            "NB": "1525691114",
+            "SU": "023935c4b863f4494388ff1190993594efbfc932e9e02b811b780f263635181b80"
+        }
+    }
+
 ### capbac revoke
 
 ```bash
