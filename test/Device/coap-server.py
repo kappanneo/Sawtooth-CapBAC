@@ -6,6 +6,13 @@ import asyncio
 import aiocoap.resource as resource
 import aiocoap
 
+from colorlog import ColoredFormatter # version 2.6
+
+from subprocess import call #or run
+#call(["ls", "-l"])
+
+def print(string:str): # true printf() debugging
+    logging.getLogger(__name__).debug(msg=string)
 
 class SimpleResource(resource.Resource):
     """Example resource which supports the GET and PUT methods."""
@@ -15,11 +22,15 @@ class SimpleResource(resource.Resource):
         self.content= b"this is an important string\n"
 
     async def render_get(self, request):
-        return aiocoap.Message(payload=self.content)
+        print('Payload: %s' % request.payload)
+        if (request.payload== b"ciao"):
+            return aiocoap.Message(payload=self.content)
+        else:
+            return aiocoap.Message(code=aiocoap.UNAUTHORIZED)
 
     async def render_put(self, request):
-        print('PUT payload: %s' % request.payload)
-        self.content= request.payload
+        print('Payload: %s' % request.payload)
+        self.content= request.payload + b"\n"
         return aiocoap.Message(code=aiocoap.CHANGED, payload=self.content)
 
 class TimeResource(resource.ObservableResource):
@@ -55,8 +66,25 @@ class TimeResource(resource.ObservableResource):
 
 # logging setup
 
-logging.basicConfig(level=logging.INFO)
-logging.getLogger("coap-server").setLevel(logging.DEBUG)
+    clog = logging.StreamHandler()
+    formatter = ColoredFormatter(
+        "%(log_color)s[%(asctime)s.%(msecs)03d %(levelname)-8s %(module)s]%(reset)s "
+        "%(white)s%(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+        reset=True,
+        log_colors={
+            'DEBUG': 'cyan',
+            'INFO': 'green',
+            'WARNING': 'yellow',
+            'ERROR': 'red',
+            'CRITICAL': 'red',
+        })
+
+    clog.setFormatter(formatter)
+
+    logger = logging.getLogger()
+    logger.setLevel(logging.DEBUG)
+    logger.addHandler(clog)
 
 def main():
     # Resource tree creation
@@ -69,6 +97,7 @@ def main():
     
     asyncio.Task(aiocoap.Context.create_server_context(root))
 
+    logging.getLogger(__name__).info(msg=" Running server...")
     asyncio.get_event_loop().run_forever()
 
 if __name__ == "__main__":
