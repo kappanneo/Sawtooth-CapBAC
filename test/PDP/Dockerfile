@@ -15,25 +15,25 @@
 
 FROM ubuntu:xenial
 
-WORKDIR /home/capbac
-
-COPY . .
-
-RUN \
- apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 8AA7AF1F1091A5FD \
+RUN apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 8AA7AF1F1091A5FD \
  && echo "deb http://repo.sawtooth.me/ubuntu/1.0/stable xenial universe" >> /etc/apt/sources.list \
- && apt-get update
-
-RUN apt-get install -y -q \
+ && apt-get update \
+ && apt-get install -y -q \
     apt-transport-https \
     build-essential \
     ca-certificates \
     python3-sawtooth-sdk \
     python3-cbor \
+    python3-pip \
  && apt-get clean \
- && rm -rf /var/lib/apt/lists/*
+ && rm -rf /var/lib/apt/lists/* \
+ && pip3 install aiocoap
 
 EXPOSE 4004/tcp
+
+WORKDIR /home/capbac
+
+COPY ./capbac-processor ./capbac-processor
 
 ENV PATH "$PATH:/home/capbac/capbac-processor"
 
