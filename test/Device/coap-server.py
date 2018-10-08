@@ -1,5 +1,7 @@
 import datetime
 import logging
+import time
+import json
 
 import asyncio
 
@@ -87,6 +89,34 @@ class TimeResource(resource.ObservableResource):
     logger.addHandler(clog)
 
 def main():
+
+    # Root token issuing
+    capability_token = {
+        "ID":"0000000000000000",
+        "DE": "coap://device",    
+        "AR": [{
+            "AC": "GET",
+            "RE": "time",
+            "DD": 5
+        }, {
+            "AC": "GET",
+            "RE": "resource",
+            "DD": 1
+        }, {
+            "AC": "PUT",
+            "RE": "resource",
+            "DD": 0
+        }],
+        "NB": str(int(time.time())),
+        "NA": "2000000000"
+    }
+
+    error = call(["capbac","issue","--root",json.dumps(capability_token)], shell = False)
+    
+    if(error):
+        logging.getLogger(__name__).error(msg="Cannot issue root token, aborting...")
+        return 1
+
     # Resource tree creation
     root = resource.Site()
 
@@ -97,7 +127,7 @@ def main():
     
     asyncio.Task(aiocoap.Context.create_server_context(root))
 
-    logging.getLogger(__name__).info(msg=" Running server...")
+    logging.getLogger(__name__).info(msg="Running server...")
     asyncio.get_event_loop().run_forever()
 
 if __name__ == "__main__":

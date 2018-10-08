@@ -206,6 +206,11 @@ def _do_issue(token, parent, subject, state):
     msg = 'Issuing capbabiltity token with ID: {}'.format(identifier)
     LOGGER.debug(msg)
 
+    if parent == None and state != {}:
+        raise InvalidTransaction(
+            'Cannot issue: root token can only be issued once'
+            .format(identifier))    
+
     if identifier in state:
         raise InvalidTransaction(
             'Cannot issue: capability token with ID = {} already exists'
