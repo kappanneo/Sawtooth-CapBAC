@@ -189,27 +189,22 @@ Expected output:
     {
         "0123456789abcdef": {
             "AR": {
-                "time": [
-                    {
-                        "GET": 5
-                    }
-                ],
-                "resource": [
-                    {
-                        "GET": 1
-                    },
-                    {
-                        "PUT": 0
-                    }
-                ]
+                "resource": {
+                    "GET": 1,
+                    "PUT": 0
+                },
+                "time": {
+                    "GET": 5
+                }
             },
             "IC": null,
-            "II": "1538842506",
+            "II": "1538930526",
             "NA": "1540691114",
             "NB": "1525691114",
-            "SU": "023935c4b863f4494388ff1190993594efbfc932e9e02b811b780f263635181b80"
+            "SU": "02e266aec5eeece3181ef71f3bfd033437f1b508051fbf7c416d091f57be41ecbd"
         }
     }
+
 
 ### capbac revoke
 
