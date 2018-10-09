@@ -87,4 +87,4 @@ EXPOSE 5683
 
 COPY ./coap-server.py .
 
-CMD sawtooth keygen sawtooth; sawtooth keygen; python3 coap-server.py
+CMD sawtooth keygen sawtooth --force; sawtooth keygen --force; python3 coap-server.py
