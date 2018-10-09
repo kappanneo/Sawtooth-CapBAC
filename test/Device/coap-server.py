@@ -97,15 +97,15 @@ def main():
         "AR": [{
             "AC": "GET",
             "RE": "time",
-            "DD": 5
+            "DD": 100
         }, {
             "AC": "GET",
             "RE": "resource",
-            "DD": 1
+            "DD": 100
         }, {
             "AC": "PUT",
             "RE": "resource",
-            "DD": 0
+            "DD": 100
         }],
         "NB": str(int(time.time())),
         "NA": "2000000000"
