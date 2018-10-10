@@ -48,7 +48,7 @@ docker exec subject capbac list coap://device
 
 Expected output if no token has been issued (only the root token is showing):
 
-```js
+```json
 {
     "0000000000000000": {
         "AR": {
@@ -82,7 +82,7 @@ capbac issue [--root] <token as JSON string>
 
 Root token issued by *device* before starting the CoAP sever (python dict from [test/Device/coap-server.py](https://gitlab.com/kappanneo/sawtooth-capbac/blob/master/test/Device/coap-server.py)):
 
-```json
+```python
 capability_token = {
     "ID":"0000000000000000",
     "DE": "coap://device",    
@@ -105,7 +105,7 @@ capability_token = {
 ```
 
 Command used (from the same file):
-```bash
+```python
 ["capbac","issue","--root",json.dumps(capability_token)]
 ```
 
@@ -115,7 +115,7 @@ She can delegate the access rights administation to a different device by issuin
 
 Example of dependant token (can only be issued by *device*):
 
-```json
+```python
 {
     "ID": "0000000000000001",
     "DE": "coap://device",
