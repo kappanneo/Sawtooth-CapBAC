@@ -10,8 +10,7 @@ import aiocoap
 
 from colorlog import ColoredFormatter # version 2.6
 
-from subprocess import call #or run
-#call(["ls", "-l"])
+from subprocess import check_output
 
 def print(string:str): # true printf() debugging
     logging.getLogger(__name__).debug(msg=string)
@@ -24,11 +23,13 @@ class SimpleResource(resource.Resource):
         self.content= b"this is an important string\n"
 
     async def render_get(self, request):
-        print('Payload: %s' % request.payload)
-        if (request.payload== b"ciao"):
-            return aiocoap.Message(payload=self.content)
-        else:
+        print('Raw payload: %s' % request.payload)
+        split_payload = request.payload.split("#",1)
+        error = call(['capbac','validate',split_payload[0]])
+        if (error):
             return aiocoap.Message(code=aiocoap.UNAUTHORIZED)
+        else: 
+            return aiocoap.Message(payload=self.content)
 
     async def render_put(self, request):
         print('Payload: %s' % request.payload)
@@ -90,6 +91,8 @@ class TimeResource(resource.ObservableResource):
 
 def main():
 
+    logging.getLogger(__name__).info(msg="Running server...")
+
     # Root token issuing
     capability_token = {
         "ID":"0000000000000000",
@@ -111,9 +114,25 @@ def main():
         "NA": "2000000000"
     }
 
-    error = call(["capbac","issue","--root",json.dumps(capability_token)], shell = False)
-    
-    if(error):
+    try:
+        logging.getLogger(__name__).info("Issuing root token...")
+        response = check_output(["capbac","issue","--root",json.dumps(capability_token)]).decode("utf-8") 
+        link = json.loads(response)["link"]
+
+        logging.getLogger(__name__).info('Checking result...')
+        for i in range(5):
+            time.sleep(5)
+            response = check_output(["curl","--silent",link]).decode("utf-8")
+            status = json.loads(response)["data"][0]["status"]
+            print(status)
+            if(status == "INVALID"):
+                raise Exception("Token not committed.")
+            elif(status == "COMMITTED"):
+                logging.getLogger(__name__).info("Token committed.")
+                break
+
+    except Exception as e:
+        print(e)
         logging.getLogger(__name__).error(msg="Cannot issue root token, aborting...")
         return 1
 
@@ -127,7 +146,6 @@ def main():
     
     asyncio.Task(aiocoap.Context.create_server_context(root))
 
-    logging.getLogger(__name__).info(msg="Running server...")
     asyncio.get_event_loop().run_forever()
 
 if __name__ == "__main__":

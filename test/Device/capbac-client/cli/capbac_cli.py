@@ -32,9 +32,9 @@ DEFAULT_URL = 'http://rest-api:8008'
 def create_console_handler(verbose_level=2):
     clog = logging.StreamHandler()
     formatter = ColoredFormatter(
-        "%(log_color)s[%(asctime)s %(levelname)-8s%(module)s]%(reset)s "
+        "%(log_color)s[%(asctime)s.%(msecs)03d %(levelname)-8s %(module)s]%(reset)s "
         "%(white)s%(message)s",
-        datefmt="%H:%M:%S",
+        datefmt="%Y-%m-%d %H:%M:%S",
         reset=True,
         log_colors={
             'DEBUG': 'cyan',
@@ -43,7 +43,7 @@ def create_console_handler(verbose_level=2):
             'ERROR': 'red',
             'CRITICAL': 'red',
         })
-
+        
     clog.setFormatter(formatter)
 
     if verbose_level == 0:
@@ -127,7 +127,7 @@ def add_issue_parser(subparsers, parent_parser):
 def do_issue(args):
     client = _get_client(args)
     response = client.issue(args.token,args.root)
-    print("Response: {}".format(response))
+    print("{}".format(response))
 
 def add_list_parser(subparsers, parent_parser):
     message = 'List all capability tokens issued for the specified device.'
@@ -181,7 +181,7 @@ def add_revoke_parser(subparsers, parent_parser):
 def do_revoke(args):
     client = _get_client(args)
     response = client.revoke(args.request)
-    print("Response: {}".format(response))
+    print("{}".format(response))
 
 def add_validate_parser(subparsers, parent_parser):
     message = 'Sends a capbac transaction to check if the request matches the capability token stored in the ledger.'

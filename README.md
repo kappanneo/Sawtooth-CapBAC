@@ -82,7 +82,7 @@ Root token issued by *device* before starting the CoAP sever (python dict from [
 
 Command used (from the same file):
 ```bash
-call(["capbac","issue","--root",json.dumps(capability_token)])
+["capbac","issue","--root",json.dumps(capability_token)]
 ```
 
 This gives *device* the control over the access rights for its resources.
