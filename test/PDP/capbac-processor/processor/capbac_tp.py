@@ -204,7 +204,7 @@ def _do_capbac(action, obj, capability, sender, state):
 def _do_issue(token, parent, subject, state):
     identifier = token.pop('ID')
     msg = 'Issuing capbabiltity token with ID: {}'.format(identifier)
-    LOGGER.debug(msg)
+    LOGGER.info(msg)
 
     if parent == None and state != {}:
         raise InvalidTransaction(
@@ -286,7 +286,7 @@ def _do_issue(token, parent, subject, state):
 def _do_revoke(request, capability, requester, state):
     identifier = request['ID']
     msg = 'Revoking capbabiltity token with ID: {}'.format(identifier)
-    LOGGER.debug(msg)
+    LOGGER.info(msg)
 
     # check existence of target
     if identifier not in state:
