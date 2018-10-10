@@ -24,12 +24,17 @@ class SimpleResource(resource.Resource):
 
     async def render_get(self, request):
         print('Raw payload: %s' % request.payload)
-        split_payload = request.payload.split("#",1)
-        error = call(['capbac','validate',split_payload[0]])
-        if (error):
+        split_payload = request.payload.decode("utf-8").split("#",1)
+
+        try:
+            result = check_output(['capbac','validate',split_payload[0]]).decode("utf-8")
+            print('Validation result: %s' % result)
+            if not json.loads(result)['authorized']:
+                raise Exception
+        except Exception: 
             return aiocoap.Message(code=aiocoap.UNAUTHORIZED)
-        else: 
-            return aiocoap.Message(payload=self.content)
+
+        return aiocoap.Message(payload=self.content)
 
     async def render_put(self, request):
         print('Payload: %s' % request.payload)

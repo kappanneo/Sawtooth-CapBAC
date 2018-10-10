@@ -31,7 +31,7 @@ docker-compose up
 
 ## Walkthrough
 
-*Examples require the testing environment to be running.
+*Examples require the testing environment to be up and running.
 
 ### List tokens
 
@@ -181,10 +181,16 @@ Now *issuer* can manage the access rights for the resources in *device*.
 ```bash
 aiocoap-client [-m <method>] [--payload <payload>]<resource URI>
 ```
+
 Example:
 
 ```bash
 docker exec subject aiocoap-client coap://device/time
+```
+
+Example with authorization:
+```bash
+docker exec device aiocoap-client --payload "$(docker exec device capbac submit '{"DE":"coap://device","AC":"GET","RE":"resource","IC":"0000000000000000"}')" coap://device/resource
 ```
 
 ### Revoke a token
