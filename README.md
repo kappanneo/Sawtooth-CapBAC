@@ -4,48 +4,70 @@
 
 ## Testing environment
 
-Requires [Docker Engine](https://docs.docker.com/install/) (17.03.0-ce or higher) and and [Docker Compose](https://docs.docker.com/compose/install/).
-
-### Build
-
 ```bash
 cd sawtooth-capbac/test/
+```
+
+*Requires [Docker Engine](https://docs.docker.com/install/) (17.03.0-ce or higher) and and [Docker Compose](https://docs.docker.com/compose/install/).
+
+
+### Build and start
+
+```bash
 docker-compose up --build
 ```
+
+### Stop and clean
+
+```bash
+docker-compose down
+```
+*Stopping the processes is not enough for a clean restart (tokens will remain).
+
+### Restart
+```bash
+docker-compose up
+```
+
+## Walkthrough
+
+*Examples require the testing environment to be running.
 
 ### List tokens
 
 ```bash
-capbac list <host URI>
+capbac list <server URI>
 ```
-*The **capbac** command can run on any docker container featuring the [capbac-client](https://gitlab.com/kappanneo/sawtooth-capbac/blob/master/capbac-client/) (*device*, *subject* or *issuer*).
+*The **capbac** command can run on any docker container featuring a [capbac-client](https://gitlab.com/kappanneo/sawtooth-capbac/blob/master/capbac-client/) (*device*, *subject* or *issuer*).
 
-Example using [docker exec](https://docs.docker.com/engine/reference/commandline/exec/) on *subject* (*device* is hosting a [CoAP](https://en.wikipedia.org/wiki/Constrained_Application_Protocol) server):
+Example using [docker exec](https://docs.docker.com/engine/reference/commandline/exec/) on *subject* (*device* is running a [CoAP](https://en.wikipedia.org/wiki/Constrained_Application_Protocol) server):
 
-```bash
+```
 docker exec subject capbac list coap://device
 ```
 
 Expected output if no token has been issued (only the root token is showing):
 
-    {
-        "0000000000000000": {
-            "AR": {
-                "resource": {
-                    "GET": 100,
-                    "PUT": 100
-                },
-                "time": {
-                    "GET": 100
-                }
+```js
+{
+    "0000000000000000": {
+        "AR": {
+            "resource": {
+                "GET": 100,
+                "PUT": 100
             },
-            "IC": null,
-            "II": "1539082955",
-            "NA": "2000000000",
-            "NB": "1539082954",
-            "SU": "03c792d1c05a37e8b9e7afdcc9c72d6b50fd77a79631d5192f754b20202979f5af"
-        }
+            "time": {
+                "GET": 100
+            }
+        },
+        "IC": null,
+        "II": "1539082955",
+        "NA": "2000000000",
+        "NB": "1539082954",
+        "SU": "03c792d1c05a37e8b9e7afdcc9c72d6b50fd77a79631d5192f754b20202979f5af"
     }
+}
+```
 
 *Subject's public key (SU) and "Not Before" time (NB) will differ.
 
@@ -60,25 +82,27 @@ capbac issue [--root] <token as JSON string>
 
 Root token issued by *device* before starting the CoAP sever (python dict from [test/Device/coap-server.py](https://gitlab.com/kappanneo/sawtooth-capbac/blob/master/test/Device/coap-server.py)):
 
-    capability_token = {
-        "ID":"0000000000000000",
-        "DE": "coap://device",    
-        "AR": [{
-            "AC": "GET",
-            "RE": "time",
-            "DD": 100
-        }, {
-            "AC": "GET",
-            "RE": "resource",
-            "DD": 100
-        }, {
-            "AC": "PUT",
-            "RE": "resource",
-            "DD": 100
-        }],
-        "NB": str(int(time.time())),
-        "NA": "2000000000"
-    }
+```json
+capability_token = {
+    "ID":"0000000000000000",
+    "DE": "coap://device",    
+    "AR": [{
+        "AC": "GET",
+        "RE": "time",
+        "DD": 100
+    }, {
+        "AC": "GET",
+        "RE": "resource",
+        "DD": 100
+    }, {
+        "AC": "PUT",
+        "RE": "resource",
+        "DD": 100
+    }],
+    "NB": str(int(time.time())),
+    "NA": "2000000000"
+}
+```
 
 Command used (from the same file):
 ```bash
@@ -89,42 +113,46 @@ This gives *device* the control over the access rights for its resources.
 
 She can delegate the access rights administation to a different device by issuing a new token dependant on the root one.
 
-Example of dependant token (can only be issued by *device*): 
+Example of dependant token (can only be issued by *device*):
 
-    {
-        "ID": "0000000000000001",
-        "DE": "coap://device",
-        "AR": [{
-            "AC": "GET",
-            "RE": "time",
-            "DD": 99
-        }, {
-            "AC": "GET",
-            "RE": "resource",
-            "DD": 99
-        }, {
-            "AC": "PUT",
-            "RE": "resource",
-            "DD": 99
-        }],
-        "NB": "1525691114",
-        "NA": "1540691114",
-        "IC": "0000000000000000",
-        "SU": <public key of the subject>
-    }
+```json
+{
+    "ID": "0000000000000001",
+    "DE": "coap://device",
+    "AR": [{
+        "AC": "GET",
+        "RE": "time",
+        "DD": 99
+    }, {
+        "AC": "GET",
+        "RE": "resource",
+        "DD": 99
+    }, {
+        "AC": "PUT",
+        "RE": "resource",
+        "DD": 99
+    }],
+    "NB": "1525691114",
+    "NA": "1540691114",
+    "IC": "0000000000000000",
+    "SU": <public key of the subject>
+}
+```
 
-
-Command having *issuer* as the subject of the token:
+Correspondong command with *issuer* as the subject of the token:
 
 ```bash
 docker exec device capbac issue '{"ID":"0000000000000001","DE":"coap://device","AR":[{"AC":"GET","RE":"time","DD":99},{"AC":"GET","RE":"resource","DD":99},{"AC":"PUT","RE":"resource","DD":99}],"NB":"1525691114","NA":"1540691114","IC":"0000000000000000","SU":"'$(docker exec issuer cat /root/.sawtooth/keys/root.pub)'"}'
 ```
+*In a real scenario *device* will know *issuer*'s public key (as every one else).
 
 Expected output:
-
-    Response: {
-    "link": "http://rest-api:8008/batch_statuses?id=2d3a434d275fdd2e0f4723e6f8bcfa1968ae9bb3b60d44dca982d5f05982017f2f9c6b31425187bfbad2f9b74d2bddc45b87d185f9bf79afaa91f6d100efdb45"
-    }
+```json
+{
+"link": "http://rest-api:8008/batch_statuses?id=2d3a434d275fdd2e0f4723e6f8bcfa1968ae9bb3b60d44dca982d5f05982017f2f9c6b31425187bfbad2f9b74d2bddc45b87d185f9bf79afaa91f6d100efdb45"
+}
+```
+*Identifiers will always differ.
 
 Access link using **curl**:
 ```bash
@@ -132,18 +160,18 @@ docker exec device curl <link>
 ```
 
 Expected output:
-
+```json
+{
+"data": [
     {
-    "data": [
-        {
-        "id": "2d3a434d275fdd2e0f4723e6f8bcfa1968ae9bb3b60d44dca982d5f05982017f2f9c6b31425187bfbad2f9b74d2bddc45b87d185f9bf79afaa91f6d100efdb45",
-        "invalid_transactions": [],
-        "status": "COMMITTED"
-        }
-    ],
-    "link": "http://rest-api:8008/batch_statuses?id=2d3a434d275fdd2e0f4723e6f8bcfa1968ae9bb3b60d44dca982d5f05982017f2f9c6b31425187bfbad2f9b74d2bddc45b87d185f9bf79afaa91f6d100efdb45"
+    "id": "2d3a434d275fdd2e0f4723e6f8bcfa1968ae9bb3b60d44dca982d5f05982017f2f9c6b31425187bfbad2f9b74d2bddc45b87d185f9bf79afaa91f6d100efdb45",
+    "invalid_transactions": [],
+    "status": "COMMITTED"
     }
-
+],
+"link": "http://rest-api:8008/batch_statuses?id=2d3a434d275fdd2e0f4723e6f8bcfa1968ae9bb3b60d44dca982d5f05982017f2f9c6b31425187bfbad2f9b74d2bddc45b87d185f9bf79afaa91f6d100efdb45"
+}
+```
 Now *issuer* can manage the access rights for the resources in *device*.
 
 [...]
@@ -166,20 +194,21 @@ capbac revoke <revocation request as JSON string>
 ```
 
 Example of revocation request:
-
-    {
-        "ID": "0000000000000000",
-        "IC": "0000000000000000",
-        "DE": "coap://device",
-        "RT": "DCO"
-    }
+```json
+{
+    "ID": "0000000000000000",
+    "IC": "0000000000000000",
+    "DE": "coap://device",
+    "RT": "DCO"
+}
+```
 
 Corresponding command:
 
 ```bash
 docker exec device capbac revoke '{"ID":"0000000000000000","IC":"0000000000000000","DE":"coap://device","RT":"DCO"}'
 ```
-This command removes all the capability tokens execept for the root one.
+This command removes all the capability tokens execept the root one.
 
 <!-- For testing purposes we can create a new sawtooth identity with:
 
