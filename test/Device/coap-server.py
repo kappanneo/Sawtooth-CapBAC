@@ -91,9 +91,8 @@ class TimeResource(resource.ObservableResource):
 
 def main():
 
-    logging.getLogger(__name__).info(msg="Running server...")
+    logging.getLogger(__name__).info(msg="Starting server...")
 
-    # Root token issuing
     capability_token = {
         "ID":"0000000000000000",
         "DE": "coap://device",    
@@ -114,27 +113,34 @@ def main():
         "NA": "2000000000"
     }
 
+    revocation = {
+        "ID":"0000000000000000",
+        "IC":"0000000000000000",
+        "DE":"coap://device",
+        "RT":"ALL"
+    }
+
     try:
-        logging.getLogger(__name__).info("Issuing root token...")
+
+        print("Issuing root token...")
         response = check_output(["capbac","issue","--root",json.dumps(capability_token)]).decode("utf-8") 
         link = json.loads(response)["link"]
 
-        logging.getLogger(__name__).info('Checking result...')
-        for i in range(5):
-            time.sleep(5)
-            response = check_output(["curl","--silent",link]).decode("utf-8")
-            status = json.loads(response)["data"][0]["status"]
-            print(status)
-            if(status == "INVALID"):
-                raise Exception("Token not committed.")
-            elif(status == "COMMITTED"):
-                logging.getLogger(__name__).info("Token committed.")
-                break
+        time.sleep(5)
+
+        print('Checking result...')
+        response = check_output(["curl","--silent",link]).decode("utf-8")
+        status = json.loads(response)["data"][0]["status"]
+
+        if(status == "COMMITTED"):
+            print("Token committed.")
+        else:
+            raise Exception("Token status: {}.".format(status))
 
     except Exception as e:
-        print(e)
-        logging.getLogger(__name__).error(msg="Cannot issue root token, aborting...")
-        return 1
+        logging.getLogger(__name__).error(msg="Unexpected error: {} Server not started.".format(str(e)))
+        while True:
+            time.sleep(360)
 
     # Resource tree creation
     root = resource.Site()
@@ -146,6 +152,7 @@ def main():
     
     asyncio.Task(aiocoap.Context.create_server_context(root))
 
+    logging.getLogger(__name__).info(msg="Server started.")
     asyncio.get_event_loop().run_forever()
 
 if __name__ == "__main__":
