@@ -80,7 +80,6 @@ COPY ./capbac-client ./capbac-client
 ENV PATH "$PATH:/home/capbac/capbac-client"
 
 RUN unset PYTHONPATH \
- && python3 /home/capbac/capbac-client/setup.py clean --all \
  && python3 /home/capbac/capbac-client/setup.py build
 
 EXPOSE 5683
