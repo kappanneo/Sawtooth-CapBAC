@@ -210,7 +210,7 @@ def add_validate_parser(subparsers, parent_parser):
 def do_validate(args):
     client = _get_client(args)
     response = client.validate(args.request)
-    print('{\n"authorized": %s\n}' % str(response).lower() )
+    print('{"authorized": %s}' % str(response).lower() )
 
 def add_submit_parser(subparsers, parent_parser):
     message = 'Return a signed access request.'
