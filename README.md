@@ -22,12 +22,33 @@ docker-compose up --build
 ```bash
 docker-compose down
 ```
-*Stopping the processes is not enough for a clean restart (tokens will remain).
+*Stopping the processes is not enough for a clean restart (issued tokens will stay).
 
 ### Restart
 ```bash
 docker-compose up
 ```
+
+### Exec commands
+
+
+```bash
+docker exec <container name> <command>
+```
+*For more information see [docker exec](https://docs.docker.com/engine/reference/commandline/exec/).
+
+
+### Attach a container
+
+```bash
+docker exec -it <container name> bash
+```
+
+Detach with:
+```bash
+exit
+```
+
 
 ## Walkthrough
 
@@ -40,7 +61,13 @@ capbac list <server URI>
 ```
 *The **capbac** command can run on any docker container featuring a [capbac-client](https://gitlab.com/kappanneo/sawtooth-capbac/blob/master/capbac-client/) (*device*, *subject* or *issuer*).
 
-Example using [docker exec](https://docs.docker.com/engine/reference/commandline/exec/) on *subject* (*device* is running a [CoAP](https://en.wikipedia.org/wiki/Constrained_Application_Protocol) server):
+In our scenario *device* is running a [CoAP](https://en.wikipedia.org/wiki/Constrained_Application_Protocol) server, so we run:
+```
+capbac list coap://device
+```
+
+
+Using **docker exec** to run direclty on *subject* (without attaching to it):
 
 ```
 docker exec subject capbac list coap://device
@@ -78,7 +105,7 @@ Expected output if no token has been issued (only the root token is showing):
 capbac issue [--root] <token as JSON string>
 ```
 
-*For more datails on the token structure see [capbac_version.py](https://gitlab.com/kappanneo/sawtooth-capbac/blob/master/capbac_version.py)
+*For more datails on the token format see [capbac_version.py](https://gitlab.com/kappanneo/sawtooth-capbac/blob/master/capbac_version.py)
 
 Root token issued by *device* before starting the CoAP sever (python dict from [test/Device/coap-server.py](https://gitlab.com/kappanneo/sawtooth-capbac/blob/master/test/Device/coap-server.py)):
 
@@ -103,11 +130,13 @@ capability_token = {
     "NA": "2000000000"
 }
 ```
+*The timestamp and the signature are not required since they are added by the [capbac-client](https://gitlab.com/kappanneo/sawtooth-capbac/blob/master/capbac-client/) when using **capbac issue**. Also, since this is a root token, the issuer's capability is always **null** and the public key of the subject is the one of the issuer, so both are not required either.
 
 Command used (from the same file):
 ```python
 ["capbac","issue","--root",json.dumps(capability_token)]
 ```
+*If an error occurs during the issuing of the root token (e.g. a root token for that resource is already committed) the server will not start.
 
 This gives *device* the control over the access rights for its resources.
 
@@ -138,13 +167,14 @@ Example of dependant token (can only be issued by *device*):
     "SU": <public key of the subject>
 }
 ```
+*The public key of the issuer, the timestamp and the signature are not required since they are added by the [capbac-client](https://gitlab.com/kappanneo/sawtooth-capbac/blob/master/capbac-client/) when using **capbac issue --root**.
 
 Correspondong command with *issuer* as the subject of the token:
 
 ```bash
 docker exec device capbac issue '{"ID":"0000000000000001","DE":"coap://device","AR":[{"AC":"GET","RE":"time","DD":99},{"AC":"GET","RE":"resource","DD":99},{"AC":"PUT","RE":"resource","DD":99}],"NB":"1525691114","NA":"1540691114","IC":"0000000000000000","SU":"'$(docker exec issuer cat /root/.sawtooth/keys/root.pub)'"}'
 ```
-*In a real scenario *device* will know *issuer*'s public key (as every one else).
+*In a real scenario *device* will know *issuer*'s public key (as every one else), but here we exploit **docker exec** to retrieve it.
 
 Expected output:
 ```json
@@ -172,32 +202,111 @@ Expected output:
 "link": "http://rest-api:8008/batch_statuses?id=2d3a434d275fdd2e0f4723e6f8bcfa1968ae9bb3b60d44dca982d5f05982017f2f9c6b31425187bfbad2f9b74d2bddc45b87d185f9bf79afaa91f6d100efdb45"
 }
 ```
-Now *issuer* can manage the access rights for the resources in *device*.
+Now *issuer* can manage the access rights for the resources in *device*. He does that by issuing more tokens.
 
-[...]
+Example of token that can be issued by *issuer*:
 
-### Request a resource [currently working on authorization]
-
+```python
+{
+    "ID": "0000000000000002",
+    "DE": "coap://device",
+    "AR": [{
+        "AC": "GET",
+        "RE": "resource",
+        "DD": 0
+    }, {
+        "AC": "PUT",
+        "RE": "resource",
+        "DD": 0
+    }],
+    "NB": "1525691114",
+    "NA": "1540691114",
+    "IC": "0000000000000001",
+    "SU": <public key of the subject>
+}
+```
+Correspondong command with *subject* as the subject of the token:
 ```bash
-aiocoap-client [-m <method>] [--payload <payload>]<resource URI>
+docker exec issuer capbac issue '{"ID":"0000000000000002","DE":"coap://device","AR":[{"AC":"GET","RE":"resource","DD":0},{"AC":"PUT","RE":"resource","DD":0}],"NB":"1525691114","NA":"1540691114","IC":"0000000000000001","SU":"'$(docker exec subject cat /root/.sawtooth/keys/root.pub)'"}'
 ```
 
-Example:
+If the token is committed *subject* will be able to perform PUT and GET on *resouce* but she will not be able to delegate this capability.
+
+### Request a resource
+
+Using the simple client from [aiocoap](https://aiocoap.readthedocs.io/en/latest/module/aiocoap.cli.client.html) one can send CoAP requests with:
 
 ```bash
-docker exec subject aiocoap-client coap://device/time
+aiocoap-client [-m <method>] [--payload <payload string>] <resource URI>
 ```
+However, since our CoAP server is CapBAC-aware, it will always return UNAUTHORIZED unless a signed validation request, pointing to a committed capability token with matchin access rights, is pre-fixed to the payload (if any, else it is sent as the payload itself). This results in the following sintax:
 
-Example with authorization:
 ```bash
-docker exec device aiocoap-client --payload "$(docker exec device capbac submit '{"DE":"coap://device","AC":"GET","RE":"resource","IC":"0000000000000000"}')" coap://device/resource
+aiocoap-client [-m <method>] --payload "<validation request JSON as string>[<payload string>]" <resource URI>
+```
+*For more datails on the validation request format see [capbac_version.py](https://gitlab.com/kappanneo/sawtooth-capbac/blob/master/capbac_version.py)
+
+Example of validation request to be submitted:
+```json
+{
+    "DE": "coap://device",
+    "AC": "GET",
+    "RE": "time",
+    "IC": "0000000000000002"
+}
+```
+Meta-data and sign are added using **capbac submit**:
+```bash
+capbac submit '{"DE":"coap://device","AC":"GET","RE":"resource","IC":"0000000000000002"}'
+```
+Outuput (prettified):
+```json
+{
+    "AC": "GET",
+    "VR": "1.0",
+    "DE": "coap://device",
+    "IC": "0000000000000002",
+    "SI": "c229618d223e9a1a18245bb7b2c0d9953b33981ae2f245bb1efbdcb8a9d15b8b5b64447dc6c07c883b7b40c0913b3ce4a35bf1d31c6c9f1a8bb4cede60c13756",
+    "RE": "resource",
+    "II": "1539261923"
+}
 ```
 
-### Revoke a token
+So a GET request like:
+
+```bash
+aiocoap-client coap://device/resource
+```
+
+Becomes:
+```bash
+aiocoap-client --payload "$(capbac submit '{"DE":"coap://device","AC":"GET","RE":"resource","IC":"0000000000000002"}')" coap://device/resource
+```
+
+Using **docker exec** on *subject*:
+```bash
+docker exec subject aiocoap-client --payload "$(docker exec subject capbac submit '{"DE":"coap://device","AC":"GET","RE":"resource","IC":"0000000000000002"}')" coap://device/resource
+```
+
+While a PUT request like:
+```bash
+aiocoap-client -m PUT --payload "some string" coap://device/resource
+```
+Becomes:
+```bash
+aiocoap-client -m PUT --payload "$(capbac submit '{"DE":"coap://device","AC":"PUT","RE":"resource","IC":"0000000000000002"}')some string" coap://device/resource
+```
+Using **docker exec** on *subject*:
+```bash
+docker exec subject aiocoap-client -m PUT --payload "$(docker exec subject capbac submit '{"DE":"coap://device","AC":"PUT","RE":"resource","IC":"0000000000000002"}')some string" coap://device/resource
+```
+### Revoke tokens
 
 ```bash
 capbac revoke <revocation request as JSON string>
 ```
+*For more datails on the revocation request format see [capbac_version.py](https://gitlab.com/kappanneo/sawtooth-capbac/blob/master/capbac_version.py)
+
 
 Example of revocation request:
 ```json
@@ -205,109 +314,17 @@ Example of revocation request:
     "ID": "0000000000000000",
     "IC": "0000000000000000",
     "DE": "coap://device",
-    "RT": "DCO"
+    "RT": "ALL"
 }
 ```
+*RT stands for "Revocation Tipe" and can be one of the following:
+1. Discendant Capabilities Only (DCO)
+2. Identified Capability Only (ICO)
+3. Both 1. and 2. (ALL)
 
 Corresponding command:
 
 ```bash
-docker exec device capbac revoke '{"ID":"0000000000000000","IC":"0000000000000000","DE":"coap://device","RT":"DCO"}'
+docker exec device capbac revoke '{"ID":"0000000000000000","IC":"0000000000000000","DE":"coap://device","RT":"ALL"}'
 ```
-This command removes all the capability tokens execept the root one.
-
-<!-- For testing purposes we can create a new sawtooth identity with:
-
-```bash
-sawtooth keygen <name>
-```
-
-The public key for the dependant capabilty:
-
-```bash
-cat /root/.sawtooth/keys/<name>.pub
-```
-
-To use the client as subject:
-
-```bash
-capbac <subcommand> --keyfile /root/.sawtooth/keys/<name>.priv
-```
-
-In order for the next examples to be consistent copy-paste the keys with:
-
-```bash
-echo 02b6b9f80ee44f5d711592def2a42941c66f461a9dbb5bf5d164c6d8b35ced8aea >> /root/.sawtooth/keys/subject.pub
-echo 6abd5b5251d0f3f98c75f77a851e71aedc44555f39775a432f6783bb445dea1b >> /root/.sawtooth/keys/subject.priv
-```
-
-Example of capability dependant on the previous one: (signature, version and timestamp still added by the client)
-
-    {
-        "ID": "0123456789abcde1",
-        "IS": "claudio@unipg.it",
-        "SU": "02b6b9f80ee44f5d711592def2a42941c66f461a9dbb5bf5d164c6d8b35ced8aea",
-        "DE": "coap://device",
-        "AR": [{
-            "AC": "GET",
-            "RE": "time",
-            "DD": 0
-        }],
-        "NB": "1525691114",
-        "NA": "1540691114",
-        "IC": "0000000000000000"
-    }
-
-Corresponding command:
-
-```bash
-capbac issue '{"ID":"0123456789abcde1","SU":"02b6b9f80ee44f5d711592def2a42941c66f461a9dbb5bf5d164c6d8b35ced8aea","DE":"coap://device","AR":[{"AC":"GET","RE":"time","DD":0}],"NB":"1525691114","NA":"1540691114","IC":"0000000000000000"}'
-```
-
-Now "subject" should be able to access "time" -->
-
-<!-- ### capbac submit
-
-```bash
-capbac submit <access request as JSON>
-```
-
-Example of access request: (signature, version and timestamp are added by the client)
-
-    {
-        "DE": "coap://device",
-        "AC": "GET",
-        "RE": "time",
-        "IC": "0123456789abcde1"
-    }
-
-Corresponding command:
-
-```bash
-capbac submit --keyfile /root/.sawtooth/keys/subject.priv '{"DE":"coap://device","AC":"GET","RE":"time","IC":"0123456789abcde1"}'
-```
-
-Output: (prettified)
-
-    {
-        "VR": "1.0",
-        "DE": "coap://device",
-        "IC": "0123456789abcde1",
-        "II": "1528492264",
-        "SI": "0bd47d10f76926f597196b1ba326c597c34504c9936eeee763cf902f90e5d3640c10531aa0e32c48c7711f3d018a27f5b980f0276a5842fcbbf38a0d5f704c2d",
-        "RE": "time",
-        "AC": "GET"
-    } -->
-
-<!-- ### capbac validate
-
-```bash
-capbac validate <access request as JSON>
-```
-
-Command corresponding to the output from previous example:
-
-```bash
-capbac validate '{"VR":"1.0","DE":"coap://device","IC":"0000000000000000","II":"1528492264","SI":"0bd47d10f76926f597196b1ba326c597c34504c9936eeee763cf902f90e5d3640c10531aa0e32c48c7711f3d018a27f5b980f0276a5842fcbbf38a0d5f704c2d","RE":"time","AC":"GET"}'
-```
- -->
+*This will remove all the capability tokens including the root one.

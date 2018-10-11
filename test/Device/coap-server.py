@@ -23,22 +23,46 @@ class SimpleResource(resource.Resource):
         self.content= b"this is an important string\n"
 
     async def render_get(self, request):
-        print('Raw payload: %s' % request.payload)
-        split_payload = request.payload.decode("utf-8").split("#",1)
+        logging.getLogger(__name__).info(msg="GET resource")
+        requested_action = "GET"
+
+        valid, ation, payload = request.payload.decode("utf-8").partition('}')
+        validation = valid + ation
+        print("Validation request: " + validation)
+        print("Actual payload: " + payload)
 
         try:
-            result = check_output(['capbac','validate',split_payload[0]]).decode("utf-8")
+            validation_json = json.loads(validation)
+            assert validation_json["AC"] == requested_action , "Invalid Token"
+            result = check_output(['capbac','validate',validation]).decode("utf-8")
             print('Validation result: %s' % result)
-            if not json.loads(result)['authorized']:
-                raise Exception
-        except Exception: 
+            assert json.loads(result)['authorized'], "Unauthorized"
+        except Exception as e:
+            print(e)
             return aiocoap.Message(code=aiocoap.UNAUTHORIZED)
 
         return aiocoap.Message(payload=self.content)
 
     async def render_put(self, request):
-        print('Payload: %s' % request.payload)
-        self.content= request.payload + b"\n"
+        logging.getLogger(__name__).info(msg="PUT resource")
+        requested_action = "PUT"
+
+        valid, ation, payload = request.payload.decode("utf-8").partition('}')
+        validation = valid + ation
+        print("Validation request: " + validation)
+        print("Actual payload: " + payload)
+
+        try:
+            validation_json = json.loads(validation)
+            assert validation_json["AC"] == requested_action , "Invalid Token"
+            result = check_output(['capbac','validate',validation]).decode("utf-8")
+            print('Validation result: %s' % result)
+            assert json.loads(result)['authorized'], "Unauthorized"
+        except Exception as e:
+            print(e)
+            return aiocoap.Message(code=aiocoap.UNAUTHORIZED)
+
+        self.content= payload.encode("utf-8") + b"\n"
         return aiocoap.Message(code=aiocoap.CHANGED, payload=self.content)
 
 class TimeResource(resource.ObservableResource):
@@ -68,6 +92,24 @@ class TimeResource(resource.ObservableResource):
             self.handle = None
 
     async def render_get(self, request):
+        logging.getLogger(__name__).info(msg="GET time")
+        requested_action = "GET"
+
+        valid, ation, payload = request.payload.decode("utf-8").partition('}')
+        validation = valid + ation
+        print("Validation request: " + validation)
+        print("Actual payload: " + payload)
+
+        try:
+            validation_json = json.loads(validation)
+            assert validation_json["AC"] == requested_action , "Invalid Token"
+            result = check_output(['capbac','validate',validation]).decode("utf-8")
+            print('Validation result: %s' % result)
+            assert json.loads(result)['authorized'], "Unauthorized"
+        except Exception as e:
+            print(e)
+            return aiocoap.Message(code=aiocoap.UNAUTHORIZED)
+
         payload = datetime.datetime.now().\
                 strftime("%Y-%m-%d %H:%M\n").encode('ascii')
         return aiocoap.Message(payload=payload)
@@ -138,7 +180,7 @@ def main():
         status = json.loads(response)["data"][0]["status"]
 
         if(status == "COMMITTED"):
-            print("Token committed.")
+            print("Root token committed.")
         else:
             raise Exception("Token status: {}.".format(status))
 
