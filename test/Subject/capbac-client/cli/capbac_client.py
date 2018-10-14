@@ -112,41 +112,39 @@ class CapBACClient:
         except:
             raise CapBACClientException('Invalid token: serialization failed')
 
+        return self.issue_from_dict(token, is_root)
+
+    def issue_from_dict(self,token, is_root):
+
         # check the formal validity of the incomplete token
-        subset = set(TOKEN_FORMAT) - {'II','SI','VR'}
+        subset = set(CAPABILITY_FORMAT) - {'II','SI','VR'}
         if is_root: subset -= {'IC','SU'}
 
-        _check_format(token,'token',TOKEN_FORMAT,subset)
+        _check_format(token,'capabiliy token',CAPABILITY_FORMAT,subset)
 
         for access_right in token['AR']:
-            _check_format(access_right,'token: access right',ACCESS_RIGHT_FORMAT)
+            _check_format(access_right,'capability token: access right',ACCESS_RIGHT_FORMAT)
 
         # time interval logical check
         try:
             not_before = int(token['NB'])
             not_after  = int(token['NA'])
         except:
-            raise CapBACClientException('Invalid token: timestamp not a number')
+            raise CapBACClientException('Invalid capability: timestamp not a number')
 
         if not_before > not_after:
-            raise CapBACClientException("Invalid token: incorrect time interval")
+            raise CapBACClientException("Invalid capability: incorrect time interval")
 
-        # add version
-        token['VR'] = FAMILY_VERSION
-
-        # add issue time
         now = int(time.time())
         if now > not_after:
-            raise CapBACClientException("token already expired")
-        token['II'] = str(now)
+            raise CapBACClientException("Capability already expired")
 
         if is_root:
             token['IC'] = None
             token['SU'] = self._signer.get_public_key().as_hex()
 
         # add signature
-        cap_string = str(cbor.dumps(token,sort_keys=True)).encode('utf-8')
-        token['SI'] = self._signer.sign(cap_string)
+        token= self.sign_dict(token)
 
         # now the token is complete
 
@@ -157,37 +155,33 @@ class CapBACClient:
 
         return self._send_transaction(payload, token['DE'])
 
-    def revoke(self, revocation):
+    def revoke(self, token):
 
         try:
-            revocation = json.loads(revocation)
+            token = json.loads(token)
         except:
-            raise CapBACClientException('Invalid revocation: serialization failed')
+            raise CapBACClientException('Invalid revocation token: serialization failed')
 
-        # check the formal validity of the incomplete revocation
+        return self.revoke_from_dict(token)
+
+    def revoke_from_dict(self, token):
+
+        # check the formal validity of the incomplete revocation token
         subset = set(REVOCATION_FORMAT) - {'II','SI','VR'}
 
-        _check_format(revocation,'revocation',REVOCATION_FORMAT,subset)
-
-        # add version
-        revocation['VR'] = FAMILY_VERSION
-
-        # add issue time
-        now = int(time.time())
-        revocation['II'] = str(now)
+        _check_format(token,'revocation token',REVOCATION_FORMAT,subset)
 
         # add signature
-        cap_string = str(cbor.dumps(revocation,sort_keys=True)).encode('utf-8')
-        revocation['SI'] = self._signer.sign(cap_string)
+        token = self.sign_dict(token)
 
-        # now the revocation request is complete
+        # now the revocation token is complete
 
         payload = cbor.dumps({
             'AC': "revoke",
-            'OB': revocation
+            'OB': token
         })
 
-        return self._send_transaction(payload, revocation['DE'])
+        return self._send_transaction(payload, token['DE'])
 
     def list(self,device):
 
@@ -215,17 +209,21 @@ class CapBACClient:
         except BaseException:
             return None
 
-    def validate(self,request):
+    def validate(self,token):
 
         try:
-            request = json.loads(request)
+            token = json.loads(token)
         except:
-            raise CapBACClientException('Invalid request: serialization failed')
+            raise CapBACClientException('Invalid access token: serialization failed')
 
-        _check_format(request,"request",VALIDATION_FORMAT)
+        return self.validate_from_dict(token)
+
+    def validate_from_dict(self,token):
+
+        _check_format(token,"access token",VALIDATION_FORMAT)
 
         # state retrival
-        device = request['DE']
+        device = token['DE']
         result = self._send_request(
             "state?address={}".format(
                 self._get_address(device)))
@@ -245,7 +243,7 @@ class CapBACClient:
 
         LOGGER.info('checking authorization')
         # check authorization
-        capability = request['IC']
+        capability = token['IC']
 
         if capability not in state:
             return False
@@ -253,8 +251,8 @@ class CapBACClient:
         LOGGER.info('checking delegation chain')
         # delegation chain check
         now = int(time.time())
-        resource = request['RE']
-        action = request['AC']
+        resource = token['RE']
+        action = token['AC']
 
         current_token = state[capability]
         parent = current_token['IC']
@@ -281,40 +279,40 @@ class CapBACClient:
 
         LOGGER.info('checking signature')
         # check signature
-        signature = request.pop('SI')
+        signature = token.pop('SI')
         if not create_context('secp256k1').verify(
             signature,
-            str(cbor.dumps(request,sort_keys=True)).encode('utf-8'),
+            str(cbor.dumps(token,sort_keys=True)).encode('utf-8'),
             Secp256k1PublicKey.from_hex(state[capability]['SU'])
             ):
             return False
 
         return True
 
-    def submit(self, request):
+    def sign(self, token):
 
         try:
-            request = json.loads(request)
+            token = json.loads(token)
         except:
-            raise CapBACClientException('Invalid request: serialization failed')
+            raise CapBACClientException('Invalid token: serialization failed')
 
-        # check the formal validity of the incomplete access request
-        subset = set(VALIDATION_FORMAT) - {'II','SI','VR'}
+        token = self.sign_dict(token)
+        return json.dumps(token)
 
-        _check_format(request,'request',VALIDATION_FORMAT,subset)
+    def sign_dict(self, token):
 
         # add version
-        request['VR'] = FAMILY_VERSION
+        token['VR'] = FAMILY_VERSION
 
         # add issue time
         now = int(time.time())
-        request['II'] = str(now)
+        token['II'] = str(now)
 
         # add signature
-        req_string = str(cbor.dumps(request,sort_keys=True)).encode('utf-8')
-        request['SI'] = self._signer.sign(req_string)
+        token_serialized = str(cbor.dumps(token,sort_keys=True)).encode('utf-8')
+        token['SI'] = self._signer.sign(token_serialized)
 
-        return json.dumps(request)
+        return token
 
     def _get_prefix(self):
         return _sha512(FAMILY_NAME.encode('utf-8'))[0:6]

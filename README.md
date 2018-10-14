@@ -54,7 +54,7 @@ exit
 
 *Examples require the testing environment to be up and running.
 
-### List tokens
+### List capabilities
 
 ```bash
 capbac list <server URI>
@@ -73,7 +73,7 @@ Using **docker exec** to run direclty on *subject* (without attaching to it):
 docker exec subject capbac list coap://device
 ```
 
-Expected output if no token has been issued (only the root token is showing):
+Expected output if no capability token has been issued (only the root token is showing):
 
 ```json
 {
@@ -99,13 +99,13 @@ Expected output if no token has been issued (only the root token is showing):
 *Subject's public key (SU) and "Not Before" time (NB) will differ.
 
 
-### Issue a token
+### Issue a capability token
 
 ```bash
 capbac issue [--root] <token as JSON string>
 ```
 
-*For more datails on the token format see [capbac_version.py](https://gitlab.com/kappanneo/sawtooth-capbac/blob/master/capbac_version.py)
+*For more datails on the capability token format see [capbac_version.py](https://gitlab.com/kappanneo/sawtooth-capbac/blob/master/capbac_version.py).
 
 Root token issued by *device* before starting the CoAP sever (python dict from [test/Device/coap-server.py](https://gitlab.com/kappanneo/sawtooth-capbac/blob/master/test/Device/coap-server.py)):
 
@@ -239,14 +239,14 @@ Using the simple client from [aiocoap](https://aiocoap.readthedocs.io/en/latest/
 ```bash
 aiocoap-client [-m <method>] [--payload <payload string>] <resource URI>
 ```
-However, since our CoAP server is CapBAC-aware, it will always return UNAUTHORIZED unless a signed validation request, pointing to a committed capability token with matchin access rights, is pre-fixed to the payload (if any, else it is sent as the payload itself). This results in the following sintax:
+However, since our CoAP server is CapBAC-aware, it will always return UNAUTHORIZED unless a signed access token, pointing to a committed capability token with matchin access rights, is pre-fixed to the payload (if any, else it is sent as the payload itself). This results in the following sintax:
 
 ```bash
-aiocoap-client [-m <method>] --payload "<validation request JSON as string>[<payload string>]" <resource URI>
+aiocoap-client [-m <method>] --payload "<access token JSON as string>[<payload string>]" <resource URI>
 ```
-*For more datails on the validation request format see [capbac_version.py](https://gitlab.com/kappanneo/sawtooth-capbac/blob/master/capbac_version.py)
+*For more datails on the access token format see [capbac_version.py](https://gitlab.com/kappanneo/sawtooth-capbac/blob/master/capbac_version.py).
 
-Example of validation request to be submitted:
+Example of access token to be signed:
 ```json
 {
     "DE": "coap://device",
@@ -255,9 +255,9 @@ Example of validation request to be submitted:
     "IC": "0000000000000002"
 }
 ```
-Meta-data and sign are added using **capbac submit**:
+The token is signed using **capbac sign**:
 ```bash
-capbac submit '{"DE":"coap://device","AC":"GET","RE":"resource","IC":"0000000000000002"}'
+capbac sign '{"DE":"coap://device","AC":"GET","RE":"resource","IC":"0000000000000002"}'
 ```
 Outuput (prettified):
 ```json
@@ -271,6 +271,7 @@ Outuput (prettified):
     "II": "1539261923"
 }
 ```
+*Issue Istant (II) and Version (VR) are added before the Signature (SI).
 
 So a GET request like:
 
@@ -280,12 +281,12 @@ aiocoap-client coap://device/resource
 
 Becomes:
 ```bash
-aiocoap-client --payload "$(capbac submit '{"DE":"coap://device","AC":"GET","RE":"resource","IC":"0000000000000002"}')" coap://device/resource
+aiocoap-client --payload "$(capbac sign '{"DE":"coap://device","AC":"GET","RE":"resource","IC":"0000000000000002"}')" coap://device/resource
 ```
 
 Using **docker exec** on *subject*:
 ```bash
-docker exec subject aiocoap-client --payload "$(docker exec subject capbac submit '{"DE":"coap://device","AC":"GET","RE":"resource","IC":"0000000000000002"}')" coap://device/resource
+docker exec subject aiocoap-client --payload "$(docker exec subject capbac sign '{"DE":"coap://device","AC":"GET","RE":"resource","IC":"0000000000000002"}')" coap://device/resource
 ```
 
 While a PUT request like:
@@ -294,21 +295,21 @@ aiocoap-client -m PUT --payload "some string" coap://device/resource
 ```
 Becomes:
 ```bash
-aiocoap-client -m PUT --payload "$(capbac submit '{"DE":"coap://device","AC":"PUT","RE":"resource","IC":"0000000000000002"}')some string" coap://device/resource
+aiocoap-client -m PUT --payload "$(capbac sign '{"DE":"coap://device","AC":"PUT","RE":"resource","IC":"0000000000000002"}')some string" coap://device/resource
 ```
 Using **docker exec** on *subject*:
 ```bash
-docker exec subject aiocoap-client -m PUT --payload "$(docker exec subject capbac submit '{"DE":"coap://device","AC":"PUT","RE":"resource","IC":"0000000000000002"}')some string" coap://device/resource
+docker exec subject aiocoap-client -m PUT --payload "$(docker exec subject capbac sign '{"DE":"coap://device","AC":"PUT","RE":"resource","IC":"0000000000000002"}')some string" coap://device/resource
 ```
-### Revoke tokens
+### Revoke capabilities
 
 ```bash
 capbac revoke <revocation request as JSON string>
 ```
-*For more datails on the revocation request format see [capbac_version.py](https://gitlab.com/kappanneo/sawtooth-capbac/blob/master/capbac_version.py)
+*For more datails on the revocation request format see [capbac_version.py](https://gitlab.com/kappanneo/sawtooth-capbac/blob/master/capbac_version.py).
 
 
-Example of revocation request:
+Example of revocation before it is signed by **capbac revoke**:
 ```json
 {
     "ID": "0000000000000000",

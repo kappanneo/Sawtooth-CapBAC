@@ -34,7 +34,7 @@ PAYLOAD_FORMAT = {
     }
 }
 
-TOKEN_FORMAT = {
+CAPABILITY_FORMAT = {
     'ID': {
         'description': 'token identifier',
         'len': IDENTIFIER_LENGTH

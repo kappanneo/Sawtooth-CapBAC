@@ -91,7 +91,7 @@ def create_parser(prog_name):
     add_list_parser(subparsers,parent_parser)
     add_revoke_parser(subparsers,parent_parser)
     add_validate_parser(subparsers,parent_parser)
-    add_submit_parser(subparsers,parent_parser)
+    add_sign_parser(subparsers,parent_parser)
 
     return parser
 
@@ -155,7 +155,7 @@ def do_list(args):
 
 def add_revoke_parser(subparsers, parent_parser):
     message = 'Sends a capbac transaction to delete one or more capabilities \
-         from the ledger, according to the revocation request (requires a revocation capability).'
+         from the ledger, according to the revocation token.'
 
     parser = subparsers.add_parser(
         'revoke',
@@ -164,9 +164,9 @@ def add_revoke_parser(subparsers, parent_parser):
         help='revoke an issued capability token')
 
     parser.add_argument(
-        'request',
+        'token',
         type=str,
-        help='revocation request (JSON)')
+        help='revocation token (JSON)')
 
     parser.add_argument(
         '--url',
@@ -180,22 +180,22 @@ def add_revoke_parser(subparsers, parent_parser):
 
 def do_revoke(args):
     client = _get_client(args)
-    response = client.revoke(args.request)
+    response = client.revoke(args.token)
     print("{}".format(response))
 
 def add_validate_parser(subparsers, parent_parser):
-    message = 'Sends a capbac transaction to check if the request matches the capability token stored in the ledger.'
+    message = 'Check the validity of the access token over the ledger state.'
 
     parser = subparsers.add_parser(
         'validate',
         parents=[parent_parser],
         description=message,
-        help='check if the capability is valid for the request')
+        help='check if the access token is valid')
 
     parser.add_argument(
-        'request',
+        'token',
         type=str,
-        help='access request to be validated (JSON)')
+        help='access token to be validated (JSON)')
 
     parser.add_argument(
         '--url',
@@ -209,43 +209,38 @@ def add_validate_parser(subparsers, parent_parser):
 
 def do_validate(args):
     client = _get_client(args)
-    response = client.validate(args.request)
+    response = client.validate(args.token)
     print('{"authorized": %s}' % str(response).lower() )
 
-def add_submit_parser(subparsers, parent_parser):
-    message = 'Return a signed access request.'
+def add_sign_parser(subparsers, parent_parser):
+    message = 'Adds Issue Istant (II), Version (VR) and Signature (SI) to the token.'
 
     parser = subparsers.add_parser(
-        'submit',
+        'sign',
         parents=[parent_parser],
         description=message,
-        help='create a signed request')
+        help='adds timestamp, version and sign to a token')
 
     parser.add_argument(
-        'request',
+        'token',
         type=str,
-        help='access request')
-
-    parser.add_argument(
-        '--url',
-        type=str,
-        help='specify URL of REST API')
+        help='token to be signed')
 
     parser.add_argument(
         '--keyfile',
         type=str,
         help="identify file containing user's private key")
 
-def do_submit(args):
+def do_sign(args):
+    args.url = None
     client = _get_client(args)
-    response = client.submit(args.request)
+    response = client.sign(args.token)
     print(response)
 
 def _get_client(args):
     return CapBACClient(
         url=DEFAULT_URL if args.url is None else args.url,
         keyfile=_get_keyfile(args))
-
 
 def _get_keyfile(args):
     try:
@@ -281,7 +276,7 @@ def main(prog_name=os.path.basename(sys.argv[0]), args=None):
     elif args.command == 'revoke':   do_revoke(args)
     elif args.command == 'validate': do_validate(args)
     elif args.command == 'list':     do_list(args)
-    elif args.command == 'submit':   do_submit(args)
+    elif args.command == 'sign':     do_sign(args)
     else:
         raise CapBACCliException("Invalid command: {}".format(args.command))
 

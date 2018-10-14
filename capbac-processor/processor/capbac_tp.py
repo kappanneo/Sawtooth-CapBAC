@@ -90,22 +90,22 @@ def _unpack_and_verify(transaction):
 
     if action == 'issue':
 
-        _check_format(obj,'capability token',TOKEN_FORMAT)
+        _check_format(obj,'capability token',CAPABILITY_FORMAT)
 
         # time interval logical check
         try:
             not_before = int(obj['NB'])
             not_after =  int(obj['NA'])
         except:
-            raise InvalidTransaction('Invalid token: timestamp not a number')
+            raise InvalidTransaction('Invalid capability token: timestamp not a number')
 
         if not_before > not_after:
-            raise InvalidTransaction("Invalid token: incorrect time interval")
+            raise InvalidTransaction("Invalid capability token: incorrect time interval")
 
         # check if expired
         now = int(time.time())
         if now >= not_after:
-            raise InvalidTransaction("Invalid token: token expired")
+            raise InvalidTransaction("Invalid capability token: capability expired")
 
         capability = obj['IC']
         if not capability: # only allowed if root token
@@ -115,7 +115,7 @@ def _unpack_and_verify(transaction):
 
     elif action == 'revoke':
 
-        _check_format(obj,'revocation request',REVOCATION_FORMAT)
+        _check_format(obj,'revocation token',REVOCATION_FORMAT)
 
         capability = obj['IC']
 
@@ -129,8 +129,8 @@ def _unpack_and_verify(transaction):
 
 def _check_signature(obj,signature,sender_key_str):
     publicKey = Secp256k1PublicKey.from_hex(sender_key_str)
-    token_string = str(cbor.dumps(obj,sort_keys=True)).encode('utf-8')
-    if not create_context('secp256k1').verify(signature,token_string,publicKey):
+    token_serialized = str(cbor.dumps(obj,sort_keys=True)).encode('utf-8')
+    if not create_context('secp256k1').verify(signature,token_serialized,publicKey):
         raise InvalidTransaction('Invalid signature.')
 
 def _check_format(dictionary,name,dictionary_format,subset=None):
@@ -283,8 +283,8 @@ def _do_issue(token, parent, subject, state):
     return state
 
 
-def _do_revoke(request, capability, requester, state):
-    identifier = request['ID']
+def _do_revoke(revocation, capability, revoker, state):
+    identifier = revocation['ID']
     msg = 'Revoking capbabiltity token with ID: {}'.format(identifier)
     LOGGER.info(msg)
 
@@ -298,8 +298,8 @@ def _do_revoke(request, capability, requester, state):
     if capability not in state:
         raise InvalidTransaction(
             'Cannot revoke: no capability token with ID = {}'.format(capability))
-    if state[capability]['SU'] != requester:
-        raise InvalidTransaction('Cannot revoke: requester is not the subject of the sent capability')
+    if state[capability]['SU'] != revoker:
+        raise InvalidTransaction('Cannot revoke: revoker is not the subject of the sent capability')
 
     LOGGER.debug('Checking delegation chain')
     # chek if revoker's token is anchestor of revoked
@@ -313,7 +313,7 @@ def _do_revoke(request, capability, requester, state):
             current_token = state[parent]
             parent = current_token['IC']
         if parent is None:
-            raise InvalidTransaction('Cannot revoke: requester capability has no right over target capability')
+            raise InvalidTransaction('Cannot revoke: revoker capability has no right over target capability')
 
     # delegation chain check
     now = int(time.time())
@@ -337,9 +337,9 @@ def _do_revoke(request, capability, requester, state):
         current_token = state[parent]
         parent = current_token['IC']
 
-    LOGGER.debug('Removing token')
+    LOGGER.debug('Removing tokens')
     # revocation
-    revocation_type = request['RT']
+    revocation_type = revocation['RT']
     if revocation_type == 'ICO': # Identified Capability Only
         if state[identifier]['IC'] is None:
             raise InvalidTransaction(
@@ -349,8 +349,11 @@ def _do_revoke(request, capability, requester, state):
                 if state[token]['IC'] == identifier:
                     state[token]['IC'] = state[identifier]['IC']
     else:
-        state =_recursively_remove_childs(state, identifier)
-
+        try:
+            state =_recursively_remove_childs(state, identifier)
+        except Exception as e:
+            LOGGER.error(state)
+            pass
     if revocation_type != 'DCO': # Dependant Capability Only
         state.pop(identifier)
 
@@ -423,7 +426,7 @@ def main(args=None):
     except KeyboardInterrupt:
         pass
     except Exception as e:  # pylint: disable=broad-except
-        print("Error: {}".format(e), file=sys.stderr)
+        LOGGER.error(e)
     finally:
         if processor is not None:
             processor.stop()
