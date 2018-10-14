@@ -67,13 +67,13 @@ capbac list coap://device
 ```
 
 
-Using **docker exec** to run direclty on *subject* (without attaching to it):
+Using **docker exec** to run direclty on *subject*:
 
 ```
 docker exec subject capbac list coap://device
 ```
 
-Expected output if no capability token has been issued (only the root token is showing):
+Expected output if no capability token has been issued (only the root token is shown):
 
 ```json
 {
@@ -130,7 +130,7 @@ capability_token = {
     "NA": "2000000000"
 }
 ```
-*The timestamp and the signature are not required since they are added by the [capbac-client](https://gitlab.com/kappanneo/sawtooth-capbac/blob/master/capbac-client/) when using **capbac issue**. Also, since this is a root token, the issuer's capability is always **null** and the public key of the subject is the one of the issuer, so both are not required either.
+*The timestamp and the signature are not required since they are added by the [capbac-client](https://gitlab.com/kappanneo/sawtooth-capbac/blob/master/capbac-client/) when using **capbac issue**. Also, since this is a root token, the issuer's capability is always **null** and the public key of the subject is the same one of the issuer, so both are not required either.
 
 Command used (from the same file):
 ```python
@@ -140,7 +140,7 @@ Command used (from the same file):
 
 This gives *device* the control over the access rights for its resources.
 
-She can delegate the access rights administation to a different device by issuing a new token dependant on the root one.
+*device* can delegate the access rights administation to a different device by issuing a new token dependant on the root one.
 
 Example of dependant token (can only be issued by *device*):
 
@@ -169,7 +169,7 @@ Example of dependant token (can only be issued by *device*):
 ```
 *The public key of the issuer, the timestamp and the signature are not required since they are added by the [capbac-client](https://gitlab.com/kappanneo/sawtooth-capbac/blob/master/capbac-client/) when using **capbac issue --root**.
 
-Correspondong command with *issuer* as the subject of the token:
+Corresponding command with *issuer* as the subject of the token:
 
 ```bash
 docker exec device capbac issue '{"ID":"0000000000000001","DE":"coap://device","AR":[{"AC":"GET","RE":"time","DD":99},{"AC":"GET","RE":"resource","DD":99},{"AC":"PUT","RE":"resource","DD":99}],"NB":"1525691114","NA":"1540691114","IC":"0000000000000000","SU":"'$(docker exec issuer cat /root/.sawtooth/keys/root.pub)'"}'
@@ -230,7 +230,8 @@ Correspondong command with *subject* as the subject of the token:
 docker exec issuer capbac issue '{"ID":"0000000000000002","DE":"coap://device","AR":[{"AC":"GET","RE":"resource","DD":0},{"AC":"PUT","RE":"resource","DD":0}],"NB":"1525691114","NA":"1540691114","IC":"0000000000000001","SU":"'$(docker exec subject cat /root/.sawtooth/keys/root.pub)'"}'
 ```
 
-If the token is committed *subject* will be able to perform PUT and GET on *resouce* but she will not be able to delegate this capability.
+If the token is committed, *subject* will be able to perform PUT and GET requests on *resouce*.
+*subject* will not be able to delegate this capabilities any further since for both the Delegation Depth (DD) is set to zero.
 
 ### Request a resource
 
