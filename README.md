@@ -2,6 +2,8 @@
 
 [Sawtooth](https://github.com/hyperledger/sawtooth-core) transaction family for [Capability Based Access Control](https://www.sciencedirect.com/science/article/pii/S089571771300054X).
 
+**DISCLAIMER**: This implementation is a proof of concept not meant to be used for real-world applications.
+
 ## Testing environment
 
 ```bash
