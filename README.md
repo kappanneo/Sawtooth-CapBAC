@@ -10,7 +10,7 @@
 cd sawtooth-capbac/test/
 ```
 
-*Requires [Docker Engine](https://docs.docker.com/install/) (17.03.0-ce or higher) and and [Docker Compose](https://docs.docker.com/compose/install/).
+*Requires [Docker Engine](https://docs.docker.com/install/) (17.03.0-ce or higher) and [Docker Compose](https://docs.docker.com/compose/install/).
 
 
 ### Build and start
