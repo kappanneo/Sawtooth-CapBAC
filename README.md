@@ -1,4 +1,4 @@
-# sawtooth-capbac
+# Sawtooth-CapBAC
 
 [Sawtooth](https://github.com/hyperledger/sawtooth-core) transaction family for [Capability Based Access Control](https://www.sciencedirect.com/science/article/pii/S089571771300054X).
 
